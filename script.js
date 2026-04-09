@@ -388,17 +388,17 @@ function getTrend(score) {
 }
 
 function getRank(score) {
-  if (score < 800000) return "/asset/rank/rank_D.webp";
-  if (score < 850000) return "/asset/rank/rank_C.webp";
-  if (score < 900000) return "/asset/rank/rank_B.webp";
-  if (score < 930000) return "/asset/rank/rank_A.webp";
-  if (score < 950000) return "/asset/rank/rank_A+.webp";
-  if (score < 970000) return "/asset/rank/rank_AA.webp";
-  if (score < 980000) return "/asset/rank/rank_AA+.webp";
-  if (score < 990000) return "/asset/rank/rank_AAA.webp";
-  if (score < 1000000) return "/asset/rank/rank_AAA+.webp";
-  if (score < 1009000) return "/asset/rank/rank_INF.webp";
-  return "/asset/rank/rank_INF+.webp";
+  if (score < 800000) return "./asset/rank/rank_D.webp";
+  if (score < 850000) return "./asset/rank/rank_C.webp";
+  if (score < 900000) return "./asset/rank/rank_B.webp";
+  if (score < 930000) return "./asset/rank/rank_A.webp";
+  if (score < 950000) return "./asset/rank/rank_A+.webp";
+  if (score < 970000) return "./asset/rank/rank_AA.webp";
+  if (score < 980000) return "./asset/rank/rank_AA+.webp";
+  if (score < 990000) return "./asset/rank/rank_AAA.webp";
+  if (score < 1000000) return "./asset/rank/rank_AAA+.webp";
+  if (score < 1009000) return "./asset/rank/rank_INF.webp";
+  return "./asset/rank/rank_INF+.webp";
 }
 
 function calculate() {
