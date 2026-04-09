@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Paradigm Tool</title>
+    <link rel="icon" href="/asset/para-favicon.ico" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- MENU -->
+    <div class="menu">
+      <button data-page="calc" class="active">Score Calculator</button>
+      <button data-page="songs">Song List</button>
+    </div>
+
+    <!-- ===== CALCULATOR PAGE ===== -->
+    <div id="calc" class="page active">
+      <div
+        class="container"
+        style="
+          background: url(&quot;https://paradigm.tunergames.com/assets/index-bg-uXsiiklS.webp&quot;)
+            no-repeat center center fixed;
+          background-size: cover;
+          height: calc(100vh - 50px);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        "
+      >
+        <div
+          style="
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 16px;
+            width: 700px;
+            border: 1px solid #38bdf8;
+          "
+          class="calc-card"
+        >
+          <div class="calc-header" style="text-align: center">
+            <img
+              src="https://paradigm.tunergames.com/assets/logo-AfbteMPK.png"
+              style="width: 150px"
+              alt="Logo"
+            />
+            <h1>Paradigm Score Calculator</h1>
+          </div>
+
+          <label>Song</label>
+          <div class="search-box">
+            <input id="songName" placeholder="Nhập tên bài..." />
+            <div id="suggestions" class="suggestions"></div>
+          </div>
+
+          <label>Difficulty</label>
+          <select id="difficulty">
+            <option>Reboot</option>
+            <option>Massive</option>
+            <option>Invaded</option>
+            <option>Detected</option>
+          </select>
+
+          <input id="constant" hidden />
+
+          <label>Score</label>
+          <input id="score" type="number" min="0" max="1010000" />
+
+          <button onclick="calculate()" class="btn btn-primary">
+            Calculate
+          </button>
+
+          <div id="calcResult" class="calc-result" style="display: none">
+            <div class="calc-cover">
+              <img id="songCover" alt="Song Cover" />
+            </div>
+            <div class="calc-card-body">
+              <div class="calc-card-header">
+                <div>
+                  <h3 id="songTitle"></h3>
+                  <p id="songArtist"></p>
+                </div>
+                <span class="calc-badge">Result</span>
+              </div>
+              <div class="calc-card-meta">
+                <div class="meta-item">
+                  <span>Notes</span>
+                  <strong id="songNotes"></strong>
+                </div>
+                <div class="meta-item">
+                  <span>BPM</span>
+                  <strong id="songBPM"></strong>
+                </div>
+                <div class="meta-item">
+                  <span>Album</span>
+                  <strong id="songAlbum"></strong>
+                </div>
+              </div>
+              <div class="calc-card-footer">
+                <div class="score-block">
+                  <div class="score-title">Rank</div>
+                  <div class="score-value" id="rank"></div>
+                </div>
+                <div class="score-block">
+                  <div class="score-title">Point</div>
+                  <div class="score-value" id="result"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SONG LIST PAGE ===== -->
+    <div id="songs" class="page song-page">
+      <img
+        src="https://paradigm.tunergames.com/assets/logo-AfbteMPK.png"
+        style="width: 200px; display: block; margin: 20px auto"
+        alt="Logo"
+      />
+
+      <h2>Song List</h2>
+      <div
+        style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap"
+      >
+        <input
+          id="searchSong"
+          type="text"
+          placeholder="Search song..."
+          style="width: 200px"
+        />
+
+        <div
+          class="checkbox-group filter-difficulty"
+          style="display: flex; gap: 8px; align-items: center"
+        >
+          <label class="checkbox-item"
+            ><input type="checkbox" value="Reboot" /> Reboot</label
+          >
+          <label class="checkbox-item"
+            ><input type="checkbox" value="Massive" /> Massive</label
+          >
+          <label class="checkbox-item"
+            ><input type="checkbox" value="Invaded" /> Invaded</label
+          >
+          <label class="checkbox-item"
+            ><input type="checkbox" value="Detected" /> Detected</label
+          >
+        </div>
+
+        <select id="filterNewOld">
+          <option value="">All</option>
+          <option value="new">New</option>
+          <option value="old">Old</option>
+        </select>
+
+        <select id="sortLevel">
+          <option value="">Sort</option>
+          <option value="level_asc">Level ↑</option>
+          <option value="level_desc">Level ↓</option>
+          <option value="notes_asc">Notes ↑</option>
+          <option value="notes_desc">Notes ↓</option>
+          <option value="version_asc">Version ↑</option>
+          <option value="version_desc">Version ↓</option>
+        </select>
+
+        <input
+          id="minLevel"
+          type="number"
+          placeholder="Min Level"
+          style="width: 120px"
+        />
+        <input
+          id="maxLevel"
+          type="number"
+          placeholder="Max Level"
+          style="width: 120px"
+        />
+
+        <button onclick="randomSong()">Random Song</button>
+      </div>
+
+      <div id="songList" class="song-list"></div>
+
+      <div
+        class="pagination-bar"
+        style="
+          margin-top: 20px;
+          text-align: center;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 10px;
+        "
+      >
+        <button onclick="prevPage()">Prev</button>
+        <span id="pageInfo" hidden>Page 1</span>
+        <div id="paginationButtons" class="pagination-buttons"></div>
+        <button onclick="nextPage()">Next</button>
+      </div>
+    </div>
+
+    <!-- ROULETTE -->
+    <div id="rouletteBox" class="roulette hidden">
+      <div id="rouletteText">🎵 ...</div>
+    </div>
+
+    <!-- POPUP DETAIL SONG -->
+    <div id="songDetailModal" class="modal hidden">
+      <div class="modal-content">
+        <span class="close" onclick="closeSongDetailModal()">✖</span>
+        <div id="songDetailCard"></div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
