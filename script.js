@@ -34,7 +34,7 @@ const DOM = {
 // ===== CONSTANTS =====
 const API_URL = "https://api.prp.icel.site/api/v1/songs";
 const COVER_BASE = "https://prp.icel.site/cover";
-const DEFAULT_IMG = "/asset/no-image.jpg";
+const DEFAULT_IMG = "./asset/no-image.jpg";
 const ITEMS_PER_PAGE = 36;
 
 let songData = [];
