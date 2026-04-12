@@ -1,68 +1,23 @@
 # Paradigm Reboot Score Tool
 
-## Project Description
+## Overview
 
-Paradigm Reboot Score Tool is a simple web tool that helps Paradigm game players calculate scores and view song lists. The project is built with pure HTML, CSS, and JavaScript, without using any frameworks.
+Paradigm Reboot Score is a lightweight, user-friendly web app for Paradigm players. It helps you browse the song library, view basic song details, and estimate points and ranks while you practice. The interface is simple — open the page in a browser and start using it.
 
-## Main Features
+## Key Features
 
-### 1. Score Calculator
-
-- Calculate scores based on song, difficulty, and achieved score
-- Display corresponding rank and points
-- Search for songs with automatic suggestions
-- Supports 4 difficulties: Reboot, Massive, Invaded, Detected
-
-### 2. Song List
-
-- Display list of all songs in the game
-- Search songs by name
-- Filter by difficulty
-- Pagination with 36 songs per page
-- Display detailed information: cover, artist, BPM, album, notes
-
-## Project Structure
-
-```
-paradigm_reboot_tool/
-├── paradigm-score.html    # Main HTML file
-├── script.js              # JavaScript logic
-├── style.css              # Stylesheet
-└── asset/
-    └── rank/              # Directory containing rank images
-```
+- Score Calculator: enter a song, select difficulty, and estimate your points and rank.
+- Song Library: browse, search, and filter songs (by difficulty or album).
+- Song Details: view cover art, artist, BPM, notes, and album information.
+- Smart Cover Handling: attempts multiple cover sources and falls back to a default image if needed.
+- Quick Picks & Random: pick a song to populate the calculator or choose a random practice target.
+- Autocomplete: helpful suggestions while typing song names.
 
 ## How to Use
 
-1. Open `paradigm-score.html` in a web browser
-2. Use the menu to switch between Score Calculator and Song List
-3. In Score Calculator:
-   - Enter song name (with automatic suggestions)
-   - Select difficulty
-   - Enter score (0-1010000)
-   - Click Calculate to view results
-4. In Song List:
-   - Use the search box to find songs
-   - Check boxes to filter by difficulty
-   - Click on a song to view details
-
-## API Used
-
-The project uses the API from `https://api.prp.icel.site/api/v1/songs` to fetch song data.
-
-## System Requirements
-
-- Modern web browser with JavaScript support
-- Internet connection to load data from API
-
-## Development
-
-The project is developed for the Paradigm player community. The source code is open and can be further improved.
-
-## Author
-
-The project is created by the Paradigm player community.
-
-## License
-
-This project has no specific license. Use for personal purposes.
+1. Open [index.html](index.html) in your web browser.
+2. Use the top menu to switch between the Score Calculator and Song List.
+3. Score Calculator:
+   - Type a song name (suggestions appear), select a difficulty, enter your score, then click "Calculate".
+4. Song List:
+   - Search or use the filters (difficulty, album), click a song to see details, or use "Random Song" for practice.
