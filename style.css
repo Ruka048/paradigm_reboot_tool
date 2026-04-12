@@ -234,6 +234,29 @@ body {
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
 }
 
+/* Sync button between min/max level inputs */
+.sync-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--primary);
+  background: var(--bg-card);
+  color: var(--text-light);
+  cursor: pointer;
+}
+.sync-btn i {
+  font-size: 14px;
+}
+.sync-btn.active {
+  background: var(--primary);
+  color: black;
+}
+
 .checkbox-group {
   display: flex;
   flex-wrap: wrap;
@@ -473,6 +496,7 @@ body {
   border-radius: 18px;
   width: 90%;
   max-width: 700px;
+  max-height: 850px;
   border: 1px solid rgba(56, 189, 248, 0.5);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
   margin: 20px;
@@ -519,6 +543,33 @@ body {
   box-shadow: 0 0 0 2px var(--primary);
 }
 
+/* Calculator tabs */
+.calc-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 8px 0 12px;
+}
+.tab-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--primary);
+  background: var(--bg-card);
+  color: var(--text-light);
+  cursor: pointer;
+}
+.tab-btn.active {
+  background: var(--primary);
+  color: black;
+  font-weight: 700;
+}
+.calc-tab-content {
+  display: none;
+}
+.calc-tab-content.active {
+  display: block;
+}
+
 .calc-card button {
   width: 100%;
   padding: 10px;
@@ -547,9 +598,9 @@ body {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 18px;
+  gap: 15px;
   margin-top: 20px;
-  padding: 18px;
+  padding: 15px;
   background: linear-gradient(
     135deg,
     rgba(15, 23, 42, 0.95),
@@ -558,7 +609,7 @@ body {
   border-radius: 24px;
   border: 1px solid rgba(56, 189, 248, 0.18);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
-  max-width: 720px;
+  max-width: 700px;
   width: 100%;
   margin-left: auto;
   margin-right: auto;
@@ -571,8 +622,8 @@ body {
 }
 
 .calc-cover {
-  width: 180px;
-  min-width: 200px;
+  width: 200px;
+  max-width: 200px;
   flex-shrink: 0;
   position: relative;
 }

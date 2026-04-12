@@ -48,7 +48,7 @@
 
           <label>Song</label>
           <div class="search-box">
-            <input id="songName" placeholder="Nhập tên bài..." />
+            <input id="songName" placeholder="Enter song name..." />
             <div id="suggestions" class="suggestions"></div>
           </div>
 
@@ -62,12 +62,49 @@
 
           <input id="constant" hidden />
 
-          <label>Score</label>
-          <input id="score" type="number" min="0" max="1010000" />
+          <div class="calc-tabs">
+            <button id="tabCalcForward" class="tab-btn active">
+              Calculate Play Rating
+            </button>
+            <button id="tabCalcReverse" class="tab-btn">
+              Find Required Score
+            </button>
+          </div>
 
-          <button onclick="calculate()" class="btn btn-primary">
-            Calculate
-          </button>
+          <div id="calcForward" class="calc-tab-content active">
+            <label>Score</label>
+            <input
+              id="score"
+              type="number"
+              min="0"
+              max="1010000"
+              placeholder="Enter your score"
+            />
+            <div
+              style="display: flex; gap: 8px; align-items: center; width: 100%"
+            >
+              <button onclick="calculate()" class="btn" style="flex: 1">
+                Calculate Play Rating
+              </button>
+            </div>
+          </div>
+
+          <div id="calcReverse" class="calc-tab-content">
+            <label>Desired Play Rating</label>
+            <input
+              id="desiredResult"
+              type="number"
+              step="0.01"
+              placeholder="Enter your target play rating"
+            />
+            <div
+              style="display: flex; gap: 8px; align-items: center; width: 100%"
+            >
+              <button onclick="findRequiredScore()" class="btn" style="flex: 1">
+                Find Required Score
+              </button>
+            </div>
+          </div>
 
           <div id="calcResult" class="calc-result" style="display: none">
             <div class="calc-cover">
@@ -116,8 +153,16 @@
                   <div class="score-value" id="rank"></div>
                 </div>
                 <div class="score-block">
-                  <div class="score-title">Point</div>
+                  <div class="score-title">Play Rating</div>
                   <div class="score-value" id="result"></div>
+                </div>
+                <div
+                  class="score-block"
+                  id="requiredScoreBlock"
+                  style="display: none"
+                >
+                  <div class="score-title">Required Score</div>
+                  <div class="score-value" id="requiredScore"></div>
                 </div>
               </div>
             </div>
@@ -187,6 +232,11 @@
           min="0"
           style="width: 120px"
         />
+
+        <button id="syncLevelsBtn" class="sync-btn" title="Link min & max">
+          <i class="fas fa-link"></i>
+        </button>
+
         <input
           id="maxLevel"
           type="number"

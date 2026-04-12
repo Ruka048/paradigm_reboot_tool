@@ -48,6 +48,9 @@ const State = {
   v2Cache: new Map(), // getSongKey → v2 song | null
   failedUrls: new Set(), // URLs confirmed broken
   triedV2Urls: new Set(), // original URLs already attempted v2 fallback
+  // Level sync state
+  levelsLinked: false,
+  _updatingLinkedLevels: false,
 };
 
 // ─────────────────────────────────────────────
@@ -68,6 +71,7 @@ const DOM = (() => {
     diffCheckboxes: () =>
       document.querySelectorAll("#difficultyDropdown input[type='checkbox']"),
     filterAlbum: $("filterAlbum"),
+    syncLevelsBtn: $("syncLevelsBtn"),
     // Pagination
     pageInfo: $("pageInfo"),
     paginationBtns: $("paginationButtons"),
@@ -95,6 +99,15 @@ const DOM = (() => {
     songNotes: $("songNotes"),
     songBPM: $("songBPM"),
     songAlbum: $("songAlbum"),
+    // Reverse-calc UI
+    desiredResult: $("desiredResult"),
+    requiredScore: $("requiredScore"),
+    requiredScoreBlock: $("requiredScoreBlock"),
+    // Calculator tabs
+    tabCalcForward: $("tabCalcForward"),
+    tabCalcReverse: $("tabCalcReverse"),
+    calcForward: $("calcForward"),
+    calcReverse: $("calcReverse"),
   };
 })();
 
@@ -756,10 +769,61 @@ const Calculator = {
     return constant * 10 * Math.pow(score / 1000000, 1.5) + trend;
   },
 
+  /**
+   * Find minimal integer score required to reach target points for a given constant.
+   * Returns null when target is not achievable within score bounds.
+   */
+  requiredScoreFor(constant, target) {
+    const MIN = 0;
+    const MAX = 1010000;
+    if (isNaN(constant) || isNaN(target)) return null;
+    // Quick bounds check
+    if (this.compute(constant, MAX) < target) return null;
+    if (this.compute(constant, MIN) >= target) return MIN;
+
+    let low = MIN;
+    let high = MAX;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      const val = this.compute(constant, mid);
+      if (val >= target) high = mid;
+      else low = mid + 1;
+    }
+    return low;
+  },
+
+  /** UI handler: read constant + desired target, compute required score, and render */
+  findRequiredScoreUI() {
+    const constant = parseFloat(DOM.constantInput.value);
+    const target = parseFloat(DOM.desiredResult?.value);
+    if (isNaN(constant) || isNaN(target)) {
+      alert("Please select a song (to set level) and enter desired points.");
+      return;
+    }
+
+    const req = this.requiredScoreFor(constant, target);
+    if (req === null) {
+      alert("Target points are not achievable for this song/level.");
+      return;
+    }
+
+    // Update UI: show required score, rank for that score, and keep target points visible
+    if (DOM.requiredScore) DOM.requiredScore.textContent = req.toString();
+    if (DOM.requiredScoreBlock) DOM.requiredScoreBlock.style.display = "block";
+    DOM.rankEl.innerHTML = `Rank: <img src="${this.getRankImg(req)}" alt="Rank" style="height:25px;">`;
+    DOM.resultEl.textContent = "Target: " + target.toFixed(2);
+
+    this._renderResultCard();
+    DOM.calcResult.style.display = "flex";
+  },
+
   /** Entry point — called from HTML onclick */
   calculate() {
     const constant = parseFloat(DOM.constantInput.value);
     const score = parseFloat(DOM.scoreInput.value);
+
+    // hide any previous reverse-calculation block
+    if (DOM.requiredScoreBlock) DOM.requiredScoreBlock.style.display = "none";
 
     if (isNaN(constant) || isNaN(score)) {
       alert("Please fill in all fields!");
@@ -1009,11 +1073,50 @@ document.addEventListener("DOMContentLoaded", () => {
   DOM.searchInput.addEventListener("input", () => UI.resetPageAndRender());
   DOM.filterNewOld.addEventListener("change", () => UI.resetPageAndRender());
   DOM.sortLevel.addEventListener("change", () => UI.resetPageAndRender());
-  DOM.minLevel.addEventListener("input", debouncedRefresh);
-  DOM.maxLevel.addEventListener("input", debouncedRefresh);
+
+  // Level inputs: support optional sync (link) between min and max
+  DOM.minLevel.addEventListener("input", (e) => {
+    if (State.levelsLinked && !State._updatingLinkedLevels) {
+      State._updatingLinkedLevels = true;
+      DOM.maxLevel.value = DOM.minLevel.value;
+      State._updatingLinkedLevels = false;
+    }
+    debouncedRefresh();
+  });
+
+  DOM.maxLevel.addEventListener("input", (e) => {
+    if (State.levelsLinked && !State._updatingLinkedLevels) {
+      State._updatingLinkedLevels = true;
+      DOM.minLevel.value = DOM.maxLevel.value;
+      State._updatingLinkedLevels = false;
+    }
+    debouncedRefresh();
+  });
+
   DOM.diffCheckboxes().forEach((cb) =>
     cb.addEventListener("change", () => UI.resetPageAndRender()),
   );
+
+  // Sync button: toggle link between min/max
+  if (DOM.syncLevelsBtn) {
+    DOM.syncLevelsBtn.addEventListener("click", () => {
+      State.levelsLinked = !State.levelsLinked;
+      DOM.syncLevelsBtn.classList.toggle("active", State.levelsLinked);
+      // when enabling, align both inputs to a sensible value (prefer min)
+      if (State.levelsLinked) {
+        const minVal = DOM.minLevel.value;
+        const maxVal = DOM.maxLevel.value;
+        const valToUse = minVal !== "" ? minVal : maxVal;
+        if (valToUse !== "") {
+          State._updatingLinkedLevels = true;
+          DOM.minLevel.value = valToUse;
+          DOM.maxLevel.value = valToUse;
+          State._updatingLinkedLevels = false;
+        }
+      }
+      UI.resetPageAndRender();
+    });
+  }
 
   // Album filter
   if (DOM.filterAlbum) {
@@ -1035,6 +1138,31 @@ document.addEventListener("DOMContentLoaded", () => {
   DOM.songNameInput.addEventListener("input", debouncedSuggest);
   DOM.difficultySelect.addEventListener("change", () => UI._fillConstant());
 
+  // Calculator tabs: switch between forward and reverse calculators
+  const setCalcTab = (tab) => {
+    if (
+      !DOM.calcForward ||
+      !DOM.calcReverse ||
+      !DOM.tabCalcForward ||
+      !DOM.tabCalcReverse
+    )
+      return;
+    const forward = tab === "forward";
+    DOM.tabCalcForward.classList.toggle("active", forward);
+    DOM.tabCalcReverse.classList.toggle("active", !forward);
+    DOM.calcForward.classList.toggle("active", forward);
+    DOM.calcReverse.classList.toggle("active", !forward);
+    // hide any reverse-result block when switching
+    if (DOM.requiredScoreBlock) DOM.requiredScoreBlock.style.display = "none";
+  };
+
+  if (DOM.tabCalcForward)
+    DOM.tabCalcForward.addEventListener("click", () => setCalcTab("forward"));
+  if (DOM.tabCalcReverse)
+    DOM.tabCalcReverse.addEventListener("click", () => setCalcTab("reverse"));
+  // default
+  setCalcTab("forward");
+
   // Close modal on outside click
   DOM.modal.addEventListener("click", (e) => {
     if (e.target === DOM.modal) Renderer.closeModal();
@@ -1053,6 +1181,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── Expose globals for HTML onclick attributes ──
   Object.assign(window, {
     calculate: () => Calculator.calculate(),
+    findRequiredScore: () => Calculator.findRequiredScoreUI(),
     randomSong: () => UI.randomSong(),
     pickThisSong: () => UI.pickSong(window.selectedSong),
     closeSongDetailModal: () => Renderer.closeModal(),
