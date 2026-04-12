@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <title>Paradigm Tool</title>
     <link rel="icon" href="./asset/para-favicon.ico" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -18,8 +22,8 @@
       <div
         class="container"
         style="
-          background: url(&quot;https://paradigm.tunergames.com/assets/index-bg-uXsiiklS.webp&quot;)
-            no-repeat center center fixed;
+          background: url(&quot;./asset/bg.webp&quot;) no-repeat center center
+            fixed;
           background-size: cover;
           height: calc(100vh - 50px);
           display: flex;
@@ -38,11 +42,7 @@
           class="calc-card"
         >
           <div class="calc-header" style="text-align: center">
-            <img
-              src="https://paradigm.tunergames.com/assets/logo-AfbteMPK.png"
-              style="width: 150px"
-              alt="Logo"
-            />
+            <img src="./asset/logo.png" style="width: 150px" alt="Logo" />
             <h1>Paradigm Score Calculator</h1>
           </div>
 
@@ -71,15 +71,26 @@
 
           <div id="calcResult" class="calc-result" style="display: none">
             <div class="calc-cover">
-              <img id="songCover" alt="Song Cover" />
+              <img
+                id="songCover"
+                alt="Song Cover"
+                onerror="this.src = './asset/no-image.jpg'"
+                loading="lazy"
+              />
             </div>
             <div class="calc-card-body">
               <div class="calc-card-header">
                 <div>
-                  <h3 id="songTitle"></h3>
+                  <!-- <h3 id="songTitle" class="song-title" data-text=""></h3> -->
+                  <div class="song-title-container-result">
+                    <h3 id="songTitle" class="song-title" data-text=""></h3>
+                  </div>
                   <p id="songArtist"></p>
+                  <div class="result-badges">
+                    <span id="resultDifficulty" class="badge"></span>
+                    <span id="resultLevel" class="badge level-badge"></span>
+                  </div>
                 </div>
-                <span class="calc-badge">Result</span>
               </div>
               <div class="calc-card-meta">
                 <div class="meta-item">
@@ -92,7 +103,11 @@
                 </div>
                 <div class="meta-item">
                   <span>Album</span>
-                  <strong id="songAlbum"></strong>
+                  <strong
+                    id="songAlbum"
+                    class="marquee-text"
+                    data-text=""
+                  ></strong>
                 </div>
               </div>
               <div class="calc-card-footer">
@@ -114,14 +129,21 @@
     <!-- ===== SONG LIST PAGE ===== -->
     <div id="songs" class="page song-page">
       <img
-        src="https://paradigm.tunergames.com/assets/logo-AfbteMPK.png"
+        src="./asset/logo.png"
         style="width: 200px; display: block; margin: 20px auto"
         alt="Logo"
       />
 
       <h2>Song List</h2>
+
       <div
-        style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap"
+        style="
+          margin-bottom: 15px;
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          align-items: center;
+        "
       >
         <input
           id="searchSong"
@@ -130,22 +152,16 @@
           style="width: 200px"
         />
 
-        <div
-          class="checkbox-group filter-difficulty"
-          style="display: flex; gap: 8px; align-items: center"
-        >
-          <label class="checkbox-item"
-            ><input type="checkbox" value="Reboot" /> Reboot</label
-          >
-          <label class="checkbox-item"
-            ><input type="checkbox" value="Massive" /> Massive</label
-          >
-          <label class="checkbox-item"
-            ><input type="checkbox" value="Invaded" /> Invaded</label
-          >
-          <label class="checkbox-item"
-            ><input type="checkbox" value="Detected" /> Detected</label
-          >
+        <div class="custom-select">
+          <button class="select-button" onclick="toggleDifficultyDropdown()">
+            Difficulty
+          </button>
+          <div class="select-dropdown" id="difficultyDropdown">
+            <label><input type="checkbox" value="Reboot" /> Reboot</label>
+            <label><input type="checkbox" value="Massive" /> Massive</label>
+            <label><input type="checkbox" value="Invaded" /> Invaded</label>
+            <label><input type="checkbox" value="Detected" /> Detected</label>
+          </div>
         </div>
 
         <select id="filterNewOld">
@@ -168,19 +184,83 @@
           id="minLevel"
           type="number"
           placeholder="Min Level"
+          min="0"
           style="width: 120px"
         />
         <input
           id="maxLevel"
           type="number"
           placeholder="Max Level"
+          min="0"
           style="width: 120px"
         />
 
+        <select id="filterAlbum" style="width: 200px">
+          <option value="">All Albums</option>
+        </select>
+
         <button onclick="randomSong()">Random Song</button>
+
+        <div
+          style="
+            margin-left: auto;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+          "
+        >
+          <button
+            data-view="grid"
+            class="view-mode-btn active"
+            onclick="toggleViewMode('grid')"
+            style="
+              padding: 8px 16px;
+              background: linear-gradient(135deg, #0f4c75, #3282b8);
+              border: none;
+              border-radius: 6px;
+              color: white;
+              cursor: pointer;
+              transition: 0.3s;
+            "
+          >
+            <i class="fas fa-grip"></i>
+          </button>
+          <button
+            data-view="table"
+            class="view-mode-btn"
+            onclick="toggleViewMode('table')"
+            style="
+              padding: 8px 16px;
+              background: linear-gradient(135deg, #0f4c75, #3282b8);
+              border: none;
+              border-radius: 6px;
+              color: white;
+              cursor: pointer;
+              transition: 0.3s;
+            "
+          >
+            <i class="fas fa-table"></i>
+          </button>
+        </div>
       </div>
 
       <div id="songList" class="song-list"></div>
+
+      <table id="songTable" class="song-table" style="display: none">
+        <thead>
+          <tr>
+            <th>Cover</th>
+            <th>Title</th>
+            <th>Artist</th>
+            <th>Difficulty</th>
+            <th>Level</th>
+            <th>Notes</th>
+            <th>BPM</th>
+            <th>Version</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
 
       <div
         class="pagination-bar"

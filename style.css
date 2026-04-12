@@ -99,7 +99,7 @@ body {
   width: 100%;
   overflow: hidden;
   text-align: center;
-  padding: 8px 8px 0;
+  padding: 8px 0 0 0;
 }
 
 .song-title {
@@ -114,6 +114,21 @@ body {
 }
 
 .song-title.marquee-animate {
+  animation: marquee linear infinite;
+}
+
+.marquee-text {
+  white-space: nowrap;
+  display: inline-block;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.marquee-text span {
+  display: inline-block;
+}
+
+.marquee-text.marquee-animate {
   animation: marquee linear infinite;
 }
 
@@ -154,11 +169,18 @@ body {
 
 .badge.new {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  background: var(--badge-new);
+  top: 8px;
+  right: 8px;
+  /* smaller, pill-shaped and slightly translucent so it doesn't block the cover */
+  background: rgba(34, 197, 94, 0.95);
   color: white;
   z-index: 2;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .badge.reboot {
@@ -172,6 +194,18 @@ body {
 }
 .badge.detected {
   background: var(--detected);
+}
+
+.result-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.level-badge {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-light);
 }
 
 /* ===== FILTER CONTROLS ===== */
@@ -298,7 +332,83 @@ body {
   font-size: 14px;
 }
 
-/* Responsive cho mobile */
+/* ===== TABLE VIEW ===== */
+.song-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-card);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+.song-table thead {
+  background: linear-gradient(135deg, #0f4c75, #3282b8);
+  color: white;
+  font-weight: bold;
+}
+
+.song-table th {
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--primary);
+}
+
+.song-table td {
+  padding: 12px 14px;
+  border: 1px solid #334155;
+  color: var(--text-light);
+}
+
+.song-table tbody tr {
+  transition: background-color var(--transition);
+}
+
+.song-table tbody tr:hover {
+  background-color: rgba(56, 189, 248, 0.1);
+  box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.15);
+}
+
+.table-cover {
+  height: 40px;
+  width: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.view-mode-btn.active {
+  background: linear-gradient(
+    135deg,
+    var(--primary),
+    var(--primary-dark)
+  ) !important;
+  color: black !important;
+  font-weight: bold;
+}
+
+.view-mode-btn:hover {
+  opacity: 0.9;
+}
+
+/* ===== RESPONSIVE TABLE ===== */
+@media (max-width: 1024px) {
+  .song-table {
+    font-size: 12px;
+  }
+
+  .song-table th,
+  .song-table td {
+    padding: 10px 8px;
+  }
+
+  .table-cover {
+    height: 35px;
+    width: 35px;
+  }
+}
+
 @media (max-width: 768px) {
   .pagination-bar {
     gap: 6px;
@@ -352,8 +462,7 @@ body {
 /* ===== CALCULATOR PAGE ===== */
 #calc {
   height: calc(100vh - 50px);
-  background: url("https://paradigm.tunergames.com/assets/index-bg-uXsiiklS.webp")
-    no-repeat center center fixed;
+  background: url("./asset/bg.webp") no-repeat center center fixed;
   background-size: cover;
 }
 
@@ -455,16 +564,22 @@ body {
   margin-right: auto;
 }
 
+.song-title-container-result {
+  width: 100%;
+  overflow: hidden;
+  padding: 8px 0 0 0;
+}
+
 .calc-cover {
   width: 180px;
-  min-width: 180px;
+  min-width: 200px;
   flex-shrink: 0;
   position: relative;
 }
 
 .calc-cover img {
   width: 100%;
-  height: 180px;
+  height: 200px;
   object-fit: cover;
   border-radius: 22px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
@@ -490,6 +605,10 @@ body {
   font-size: 1.3rem;
   color: #f8fafc;
   line-height: 1.2;
+}
+.calc-card-header h3.song-title {
+  max-width: 350px; /* hoặc 250px */
+  white-space: nowrap;
 }
 
 .calc-card-header p {
@@ -522,6 +641,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   padding: 14px 16px;
+  max-height: 80px;
 }
 
 .meta-item span {
@@ -671,6 +791,59 @@ body {
   font-size: 1.5rem;
   cursor: pointer;
   color: var(--text-light);
+}
+
+/* ===== CUSTOM SELECT ===== */
+.custom-select {
+  position: relative;
+  display: inline-block;
+}
+
+.select-button {
+  padding: 10px;
+  background: var(--bg-card) !important;
+  color: white;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  min-width: 120px;
+  text-align: left;
+  transition: var(--transition);
+}
+
+.select-button:hover {
+  background: var(--bg-card);
+}
+
+.select-button::after {
+  content: "▼";
+  float: right;
+  margin-left: 10px;
+}
+
+.select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg-menu);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  min-width: 120px;
+  display: none;
+  z-index: 10;
+  padding: 10px;
+}
+
+.select-dropdown label {
+  display: block;
+  padding: 5px 0;
+  cursor: pointer;
+  color: var(--text-light);
+}
+
+.select-dropdown input[type="checkbox"] {
+  margin-right: 8px;
 }
 
 .result-card {

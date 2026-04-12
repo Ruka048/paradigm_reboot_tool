@@ -1,544 +1,1065 @@
-// ===== CACHE DOM ELEMENTS =====
-const DOM = {
-  songList: document.getElementById("songList"),
-  searchInput: document.getElementById("searchSong"),
-  minLevel: document.getElementById("minLevel"),
-  maxLevel: document.getElementById("maxLevel"),
-  filterNewOld: document.getElementById("filterNewOld"),
-  filterDifficultyInputs: document.querySelectorAll(
-    ".filter-difficulty input[type='checkbox']",
-  ),
-  sortLevel: document.getElementById("sortLevel"),
-  pageInfo: document.getElementById("pageInfo"),
-  paginationButtons: document.getElementById("paginationButtons"),
-  modal: document.getElementById("songDetailModal"),
-  modalCard: document.getElementById("songDetailCard"),
-  rouletteBox: document.getElementById("rouletteBox"),
-  rouletteText: document.getElementById("rouletteText"),
-  constantInput: document.getElementById("constant"),
-  scoreInput: document.getElementById("score"),
-  resultSpan: document.getElementById("result"),
-  rankImg: document.getElementById("rank"),
-  songNameInput: document.getElementById("songName"),
-  difficultySelect: document.getElementById("difficulty"),
-  suggestionsDiv: document.getElementById("suggestions"),
-  calcResult: document.getElementById("calcResult"),
-  songCover: document.getElementById("songCover"),
-  songTitle: document.getElementById("songTitle"),
-  songArtist: document.getElementById("songArtist"),
-  songNotes: document.getElementById("songNotes"),
-  songBPM: document.getElementById("songBPM"),
-  songAlbum: document.getElementById("songAlbum"),
-};
+// =============================================================================
+// PARADIGM TOOL — script.js
+// Architecture: Module pattern with clear separation of concerns
+//   - Config        : constants & settings
+//   - State         : single source of truth
+//   - DOM           : cached element references
+//   - Utils         : pure helpers (escape, debounce, version compare)
+//   - ImageService  : cover URL resolution & fallback chain
+//   - ApiService    : data fetching
+//   - FilterService : filter + sort logic
+//   - Renderer      : grid / table / pagination / modal rendering
+//   - Calculator    : score calculation logic
+//   - UI            : page navigation, view mode, suggestions, roulette
+//   - Init          : wires everything together
+// =============================================================================
 
-// ===== CONSTANTS =====
-const API_URL = "https://api.prp.icel.site/api/v1/songs";
-const COVER_BASE = "https://prp.icel.site/cover";
-const DEFAULT_IMG = "./asset/no-image.jpg";
-const ITEMS_PER_PAGE = 36;
-
-let songData = [];
-let currentPage = 1;
-let selectedCover = null;
-let selectedSongInfo = null;
-
-// ===== HELPER: VERSION COMPARE (reusable) =====
-const versionCompare = (v1, v2, ascending = true) => {
-  const parts1 = (v1 || "0").split(".").map(Number);
-  const parts2 = (v2 || "0").split(".").map(Number);
-  const maxLen = Math.max(parts1.length, parts2.length);
-  for (let i = 0; i < maxLen; i++) {
-    const p1 = parts1[i] || 0;
-    const p2 = parts2[i] || 0;
-    if (p1 !== p2) return ascending ? p1 - p2 : p2 - p1;
-  }
-  return 0;
-};
-
-// ===== DEBOUNCE UTILITY =====
-function debounce(fn, delay) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
-}
-
-// ===== FILTER & SORT (optimized) =====
-function getFilteredSongs() {
-  const searchTerm = DOM.searchInput.value.toLowerCase();
-  const filterDiffs = Array.from(DOM.filterDifficultyInputs)
-    .filter((checkbox) => checkbox.checked)
-    .map((checkbox) => checkbox.value);
-  const filterNewOld = DOM.filterNewOld.value;
-  const sortType = DOM.sortLevel.value;
-  const minLv = parseFloat(DOM.minLevel.value);
-  const maxLv = parseFloat(DOM.maxLevel.value);
-
-  let filtered = [...songData];
-
-  // Search filter
-  if (searchTerm) {
-    filtered = filtered.filter(
-      (s) =>
-        s.title.toLowerCase().includes(searchTerm) ||
-        s.artist.toLowerCase().includes(searchTerm),
-    );
-  }
-
-  // Difficulty filter
-  if (filterDiffs.length > 0) {
-    filtered = filtered.filter((s) => filterDiffs.includes(s.difficulty));
-  }
-
-  // New/Old filter
-  if (filterNewOld === "new") filtered = filtered.filter((s) => s.b15 === true);
-  else if (filterNewOld === "old") filtered = filtered.filter((s) => !s.b15);
-
-  // Level range filter
-  if (!isNaN(minLv)) filtered = filtered.filter((s) => s.level >= minLv);
-  if (!isNaN(maxLv)) filtered = filtered.filter((s) => s.level <= maxLv);
-
-  // Sort
-  switch (sortType) {
-    case "level_asc":
-      filtered.sort((a, b) => a.level - b.level);
-      break;
-    case "level_desc":
-      filtered.sort((a, b) => b.level - a.level);
-      break;
-    case "notes_asc":
-      filtered.sort((a, b) => (a.notes || 0) - (b.notes || 0));
-      break;
-    case "notes_desc":
-      filtered.sort((a, b) => (b.notes || 0) - (a.notes || 0));
-      break;
-    case "version_asc":
-      filtered.sort((a, b) => versionCompare(a.version, b.version, true));
-      break;
-    case "version_desc":
-      filtered.sort((a, b) => versionCompare(a.version, b.version, false));
-      break;
-    default:
-      break;
-  }
-
-  return filtered;
-}
-
-// ===== PAGINATION RENDER =====
-function renderPagination(totalPages) {
-  DOM.paginationButtons.innerHTML = "";
-  if (totalPages <= 1) return;
-
-  const pages = [];
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else if (currentPage <= 4) {
-    pages.push(1, 2, 3, 4, 5, "...", totalPages);
-  } else if (currentPage >= totalPages - 3) {
-    pages.push(
-      1,
-      "...",
-      totalPages - 4,
-      totalPages - 3,
-      totalPages - 2,
-      totalPages - 1,
-      totalPages,
-    );
-  } else {
-    pages.push(
-      1,
-      "...",
-      currentPage - 1,
-      currentPage,
-      currentPage + 1,
-      "...",
-      totalPages,
-    );
-  }
-
-  pages.forEach((page) => {
-    if (page === "...") {
-      const span = document.createElement("span");
-      span.className = "page-separator";
-      span.textContent = "...";
-      DOM.paginationButtons.appendChild(span);
-      return;
-    }
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = page;
-    btn.className = page === currentPage ? "page-btn active" : "page-btn";
-    btn.onclick = () => {
-      if (currentPage !== page) {
-        currentPage = page;
-        renderSongs();
-      }
-    };
-    DOM.paginationButtons.appendChild(btn);
-  });
-}
-
-// ===== MARQUEE EFFECT (optimized) =====
-function applyMarquee() {
-  setTimeout(() => {
-    document.querySelectorAll(".song-title").forEach((el) => {
-      const container = el.parentElement;
-      const innerSpan = el.querySelector("span");
-      if (!innerSpan) return;
-
-      const textWidth = innerSpan.scrollWidth;
-      const containerWidth = container.clientWidth;
-      const originalText = el.getAttribute("data-text");
-
-      if (textWidth > containerWidth) {
-        const duration = Math.max(
-          6,
-          Math.round((textWidth + containerWidth) / 70),
-        );
-        el.classList.add("marquee-animate");
-        el.style.animationDuration = `${duration}s`;
-        el.style.textAlign = "left";
-        el.innerHTML = `<span style="display: inline-block; padding-right: 48px;">${originalText}</span><span style="display: inline-block;">${originalText}</span>`;
-      } else {
-        el.classList.remove("marquee-animate");
-        el.style.animationDuration = "";
-        el.style.transform = "";
-        el.innerHTML = `<span>${originalText}</span>`;
-        el.style.textAlign = "center";
-      }
-    });
-  }, 150);
-}
-
-// ===== RENDER SONG LIST =====
-function renderSongs() {
-  const filtered = getFilteredSongs();
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  if (currentPage > totalPages) currentPage = totalPages || 1;
-
-  const start = (currentPage - 1) * ITEMS_PER_PAGE;
-  const pageData = filtered.slice(start, start + ITEMS_PER_PAGE);
-
-  DOM.songList.innerHTML = "";
-  pageData.forEach((song) => {
-    const div = document.createElement("div");
-    div.className = "song-item";
-    const imgSrc = song.cover ? `${COVER_BASE}/${song.cover}` : DEFAULT_IMG;
-    div.innerHTML = `
-      ${song.b15 ? '<span class="badge new">NEW</span>' : ""}
-      <img src="${imgSrc}" onerror="this.src='${DEFAULT_IMG}'" loading="lazy">
-      <div class="song-title-container">
-        <h4 class="song-title" data-text="${escapeHtml(song.title)}">
-          <span>${escapeHtml(song.title)}</span>
-        </h4>
-      </div>
-      <p style="margin: 0 0 12px 0; font-size: 12px; color: #666;">${escapeHtml(song.artist)}</p>
-      <div class="song-level">
-        <span class="badge ${song.difficulty.toLowerCase()}">${song.difficulty}</span>
-        <span>Lv ${song.level}</span>
-      </div>
-    `;
-    div.onclick = () => showSongDetail(song);
-    DOM.songList.appendChild(div);
-  });
-
-  DOM.pageInfo.innerText = `Page ${currentPage} / ${totalPages}`;
-  renderPagination(totalPages);
-  applyMarquee();
-}
-
-// Helper to escape HTML
-function escapeHtml(str) {
-  if (!str) return "";
-  return str.replace(/[&<>]/g, function (m) {
-    if (m === "&") return "&amp;";
-    if (m === "<") return "&lt;";
-    if (m === ">") return "&gt;";
-    return m;
-  });
-}
-
-// ===== MODAL DETAILS =====
-function showSongDetail(song) {
-  const imgSrc = song.cover ? `${COVER_BASE}/${song.cover}` : DEFAULT_IMG;
-  DOM.modalCard.innerHTML = `
-    <div class="result-card">
-      <img src="${imgSrc}"  onerror="this.src='${DEFAULT_IMG}'" loading="lazy">
-      <h4 style="margin:5px 0 2px 0;">${escapeHtml(song.title)}</h4>
-      <p style="margin: 0 0 12px 0; font-size: 12px; color: #666;">${escapeHtml(song.artist)}</p>
-      <div class="song-level">
-        <span class="badge ${song.difficulty.toLowerCase()}">${song.difficulty}</span>
-        <span>Lv ${song.level}</span>
-      </div>
-      <div style="margin-top: 12px; font-size: 12px; color: #cbd5f5; text-align: left; width: 100%;">
-        <div style="display: flex; justify-content: space-between; margin: 6px 0; gap: 12px;">
-          <span><strong>Genre:</strong> ${escapeHtml(song.genre) || "N/A"}</span>
-          <span><strong>BPM:</strong> ${escapeHtml(song.bpm) || "N/A"}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin: 6px 0; gap: 12px;">
-          <span><strong>Notes:</strong> ${song.notes || "N/A"}</span>
-          <span><strong>Album:</strong> ${escapeHtml(song.album) || "N/A"}</span>
-        </div>
-        <div style="margin: 6px 0;">
-          <span><strong>Version:</strong> ${escapeHtml(song.version) || "N/A"}</span>
-        </div>
-      </div>
-      <button style="margin-top: 10px;" onclick="pickThisSong()" class="btn btn-primary">Pick this song</button>
-    </div>
-  `;
-  window.selectedSong = song;
-  DOM.modal.classList.add("show");
-}
-
-function closeSongDetailModal() {
-  DOM.modal.classList.remove("show");
-}
-
-function pickThisSong() {
-  const song = window.selectedSong;
-  if (!song) return;
-  switchPage("calc");
-  DOM.songNameInput.value = song.title;
-  DOM.difficultySelect.value = song.difficulty;
-  DOM.constantInput.value = song.level;
-  selectedCover = song.cover ? `${COVER_BASE}/${song.cover}` : DEFAULT_IMG;
-  selectedSongInfo = song;
-  closeSongDetailModal();
-}
-
-// ===== PAGE NAVIGATION (fixed no global event) =====
-function switchPage(pageId) {
-  document
-    .querySelectorAll(".page")
-    .forEach((p) => p.classList.remove("active"));
-  document.getElementById(pageId).classList.add("active");
-}
-
-function setActiveMenuButton(btn) {
-  document
-    .querySelectorAll(".menu button")
-    .forEach((b) => b.classList.remove("active"));
-  btn.classList.add("active");
-}
-
-// Attach to menu buttons manually in HTML or via JS
-document.querySelectorAll(".menu button").forEach((btn) => {
-  btn.addEventListener("click", (e) => {
-    const pageId = btn.getAttribute("data-page"); // need data-page="list" or "calc"
-    if (pageId) switchPage(pageId);
-    setActiveMenuButton(btn);
-  });
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+const Config = Object.freeze({
+  API_V1: "https://api.prp.icel.site/api/v1/songs",
+  API_V2: "https://api.prp-test.icel.site/api/v2/songs",
+  COVER_V1: "https://prp.icel.site/cover",
+  COVER_V2: "https://prp-web-v2-f4ty2hjgt-icelocke.vercel.app/cover",
+  DEFAULT_IMG: "./asset/no-image.jpg",
+  PAGE_SIZE: 36,
+  MAX_FALLBACKS: 3,
+  SUGGESTIONS: 10,
 });
 
-// ===== RANDOM SONG (roulette) =====
-async function randomSong() {
-  const filtered = getFilteredSongs();
-  if (!filtered.length) {
-    alert("No songs match your criteria!");
-    return;
-  }
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+const State = {
+  songs: [], // all songs from API v1
+  currentPage: 1,
+  viewMode: "grid",
+  selectedCover: null,
+  selectedSong: null, // song picked for calculator
+  renderPending: false, // for batched scheduleRender
 
-  DOM.rouletteBox.classList.add("show");
-  let duration = 2000;
-  let intervalTime = 50;
-  let elapsed = 0;
+  // API fetch guards
+  v1Fetched: false,
+  v2Promise: null,
+  v2List: null,
 
-  const interval = setInterval(() => {
-    const rand = filtered[Math.floor(Math.random() * filtered.length)];
-    DOM.rouletteText.innerText = `${rand.title} - ${rand.difficulty} Lv ${rand.level}`;
-    elapsed += intervalTime;
-    intervalTime += 15;
-    if (elapsed >= duration) {
-      clearInterval(interval);
-      DOM.rouletteBox.classList.remove("show");
-      const finalSong = filtered[Math.floor(Math.random() * filtered.length)];
-      showSongDetail(finalSong);
+  // Caches
+  v2Cache: new Map(), // getSongKey → v2 song | null
+  failedUrls: new Set(), // URLs confirmed broken
+  triedV2Urls: new Set(), // original URLs already attempted v2 fallback
+};
+
+// ─────────────────────────────────────────────
+// DOM
+// ─────────────────────────────────────────────
+const DOM = (() => {
+  const $ = (id) => document.getElementById(id);
+  return {
+    // Song list
+    songList: $("songList"),
+    songTable: $("songTable"),
+    // Filters
+    searchInput: $("searchSong"),
+    minLevel: $("minLevel"),
+    maxLevel: $("maxLevel"),
+    filterNewOld: $("filterNewOld"),
+    sortLevel: $("sortLevel"),
+    diffCheckboxes: () =>
+      document.querySelectorAll("#difficultyDropdown input[type='checkbox']"),
+    filterAlbum: $("filterAlbum"),
+    // Pagination
+    pageInfo: $("pageInfo"),
+    paginationBtns: $("paginationButtons"),
+    // Modal
+    modal: $("songDetailModal"),
+    modalCard: $("songDetailCard"),
+    // Roulette
+    rouletteBox: $("rouletteBox"),
+    rouletteText: $("rouletteText"),
+    // Calculator inputs
+    constantInput: $("constant"),
+    scoreInput: $("score"),
+    songNameInput: $("songName"),
+    difficultySelect: $("difficulty"),
+    suggestionsDiv: $("suggestions"),
+    // Calculator result
+    calcResult: $("calcResult"),
+    rankEl: $("rank"),
+    resultEl: $("result"),
+    songCover: $("songCover"),
+    songTitle: $("songTitle"),
+    songArtist: $("songArtist"),
+    resultDifficulty: $("resultDifficulty"),
+    resultLevel: $("resultLevel"),
+    songNotes: $("songNotes"),
+    songBPM: $("songBPM"),
+    songAlbum: $("songAlbum"),
+  };
+})();
+
+// ─────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────
+const Utils = {
+  /** Escape HTML special chars including quotes */
+  escapeHtml(str) {
+    if (!str) return "";
+    return String(str).replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c],
+    );
+  },
+
+  /** Debounce a function */
+  debounce(fn, delay) {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  },
+
+  /** Compare semver strings */
+  versionCompare(a, b, asc = true) {
+    const toArr = (v) => (v || "0").split(".").map(Number);
+    const pa = toArr(a),
+      pb = toArr(b);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+      const d = (pa[i] || 0) - (pb[i] || 0);
+      if (d !== 0) return asc ? d : -d;
     }
-  }, intervalTime);
-}
+    return 0;
+  },
 
-// ===== LOAD API =====
-async function loadSongs() {
-  try {
-    const res = await fetch(API_URL);
-    const data = await res.json();
-    songData = data.data || data;
-    currentPage = 1;
-    renderSongs();
-  } catch (err) {
-    console.error("Failed to load songs", err);
-    DOM.songList.innerHTML =
-      "<p>Error loading songs. Please try again later.</p>";
-  }
-}
+  /** Normalise string for fuzzy matching */
+  normalise(s) {
+    return String(s || "")
+      .toLowerCase()
+      .trim();
+  },
+};
 
-// ===== CALCULATOR FUNCTIONS (unchanged logic) =====
-function getTrend(score) {
-  if (score < 900000) return -9;
-  if (score < 930000) return -6;
-  if (score < 950000) return -5;
-  if (score < 970000) return -4;
-  if (score < 980000) return -3;
-  if (score < 990000) return -2;
-  if (score < 1000000) return -1;
-  if (score < 1009000) return 0;
-  return 1;
-}
+// ─────────────────────────────────────────────
+// IMAGE SERVICE
+// ─────────────────────────────────────────────
+const ImageService = {
+  /** Build cover URL from a song object */
+  getCoverUrl(song) {
+    if (!song?.cover) return Config.DEFAULT_IMG;
+    const base = song._v2Applied ? Config.COVER_V2 : Config.COVER_V1;
+    return `${base.replace(/\/$/, "")}/${song.cover.replace(/^\/+/, "")}`;
+  },
 
-function getRank(score) {
-  if (score < 800000) return "./asset/rank/rank_D.webp";
-  if (score < 850000) return "./asset/rank/rank_C.webp";
-  if (score < 900000) return "./asset/rank/rank_B.webp";
-  if (score < 930000) return "./asset/rank/rank_A.webp";
-  if (score < 950000) return "./asset/rank/rank_A+.webp";
-  if (score < 970000) return "./asset/rank/rank_AA.webp";
-  if (score < 980000) return "./asset/rank/rank_AA+.webp";
-  if (score < 990000) return "./asset/rank/rank_AAA.webp";
-  if (score < 1000000) return "./asset/rank/rank_AAA+.webp";
-  if (score < 1009000) return "./asset/rank/rank_INF.webp";
-  return "./asset/rank/rank_INF+.webp";
-}
+  /** Build a v2 cover URL directly from filename */
+  _v2Url(filename) {
+    return `${Config.COVER_V2.replace(/\/$/, "")}/${filename.replace(/^\/+/, "")}`;
+  },
 
-function calculate() {
-  const constant = parseFloat(DOM.constantInput.value);
-  const score = parseFloat(DOM.scoreInput.value);
+  /** Attach onerror handler to an img element */
+  attachFallback(imgEl, song) {
+    if (!imgEl) return;
+    imgEl.onerror = () => this.handleError(imgEl, song).catch(() => {});
+  },
 
-  if (isNaN(constant) || isNaN(score)) {
-    alert("Please fill in all fields!");
-    return;
-  }
+  /** Multi-stage fallback: v1 → v2 direct → v2 lookup → default */
+  async handleError(imgEl, song) {
+    if (!imgEl || imgEl.dataset.fallbackDone) return;
 
-  if (score < 0 || score > 1010000) {
-    alert("Score must be between 0 and 1,010,000!");
-    return;
-  }
+    const attempts = Number(imgEl.dataset.fallbackAttempts || 0);
+    if (attempts >= Config.MAX_FALLBACKS) {
+      return this._setDefault(imgEl);
+    }
+    imgEl.dataset.fallbackAttempts = attempts + 1;
 
-  const trend = getTrend(score);
-  let result;
-  if (score >= 1009000) {
-    result =
-      constant * 10 + 6 + Math.pow((score - 1009000) / 1000, 1.35) * 3 + trend;
-  } else if (score >= 1000000) {
-    result = constant * 10 + ((score / 10000 - 100) * 20) / 3 + trend;
-  } else {
-    result = constant * 10 * Math.pow(score / 1000000, 1.5) + trend;
-  }
+    const currentSrc = imgEl.src;
+    State.failedUrls.add(currentSrc);
 
-  DOM.rankImg.innerHTML = `Rank: <img src="${getRank(score)}" alt="Rank" style="height: 25px;">`;
-  DOM.resultSpan.innerText = "Result: " + result.toFixed(2);
+    // Stage 1: try v2 URL directly (once per original URL)
+    if (!imgEl.dataset.triedV2Direct && song?.cover) {
+      imgEl.dataset.triedV2Direct = "1";
+      const v2Direct = this._v2Url(song.cover);
 
-  // Display cover and result
-  if (selectedCover && selectedSongInfo) {
-    DOM.songCover.src = selectedCover;
+      if (
+        !State.triedV2Urls.has(currentSrc) &&
+        !State.failedUrls.has(v2Direct)
+      ) {
+        State.triedV2Urls.add(currentSrc);
+        this._setSrc(imgEl, song, v2Direct);
+
+        // Background: fetch v2 metadata to update song object
+        ApiService.fetchV2Song(song)
+          .then((v2) => {
+            if (v2?.cover) {
+              song.cover = v2.cover;
+              song._v2Applied = true;
+              Renderer.scheduleRender();
+            }
+          })
+          .catch(() => {});
+        return;
+      }
+    }
+
+    // Stage 2: lookup v2 metadata and use its cover
+    try {
+      const v2 = await ApiService.fetchV2Song(song);
+      if (v2?.cover) {
+        const v2Url = this._v2Url(v2.cover);
+        if (!State.failedUrls.has(v2Url)) {
+          song.cover = v2.cover;
+          song._v2Applied = true;
+          this._setSrc(imgEl, song, v2Url);
+          Renderer.scheduleRender();
+          return;
+        }
+      }
+    } catch (_) {
+      /* fall through */
+    }
+
+    // Stage 3: give up, show default
+    this._setDefault(imgEl);
+  },
+
+  _setSrc(imgEl, song, url) {
+    imgEl.onerror = null;
+    imgEl.src = url;
+    imgEl.onerror = () => this.handleError(imgEl, song).catch(() => {});
+  },
+
+  _setDefault(imgEl) {
+    imgEl.onerror = null;
+    imgEl.src = Config.DEFAULT_IMG;
+    imgEl.dataset.fallbackDone = "1";
+  },
+};
+
+// ─────────────────────────────────────────────
+// API SERVICE
+// ─────────────────────────────────────────────
+const ApiService = {
+  /** Load all songs from v1. Idempotent — safe to call multiple times. */
+  async loadSongs() {
+    if (State.v1Fetched) return;
+    State.v1Fetched = true;
+    try {
+      const res = await fetch(Config.API_V1);
+      const data = await res.json();
+      State.songs = data.data ?? data ?? [];
+      State.currentPage = 1;
+      UI.buildAlbumDropdown(); // populate album filter once data is ready
+      Renderer.renderSongs();
+    } catch (err) {
+      console.error("[ApiService] Failed to load v1 songs:", err);
+      State.v1Fetched = false; // allow retry
+      DOM.songList.innerHTML =
+        "<p class='error-msg'>Failed to load songs. Please try again later.</p>";
+    }
+  },
+
+  /** Fetch v2 song list (shared, deduped). */
+  async _ensureV2List() {
+    if (State.v2List !== null) return;
+    if (!State.v2Promise) {
+      State.v2Promise = fetch(Config.API_V2)
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((data) => {
+          const list = data.data ?? data ?? [];
+          State.v2List = Array.isArray(list) ? list : [];
+        })
+        .catch((err) => {
+          console.warn("[ApiService] v2 list fetch failed:", err);
+          State.v2List = [];
+        });
+    }
+    await State.v2Promise;
+  },
+
+  /** Find v2 match for a song object. Results are cached. */
+  async fetchV2Song(song) {
+    const key = `${Utils.normalise(song.title)}|${Utils.normalise(song.artist)}|${Utils.normalise(song.difficulty)}`;
+    if (State.v2Cache.has(key)) return State.v2Cache.get(key);
+
+    await this._ensureV2List();
+
+    const list = State.v2List;
+    if (!list?.length) {
+      State.v2Cache.set(key, null);
+      return null;
+    }
+
+    const coverName = (song.cover || "").replace(/^\/+/, "");
+    const songId = song.id ?? song._id ?? song.songId ?? song.sid;
+    const normTitle = Utils.normalise(song.title);
+    const normArtist = Utils.normalise(song.artist);
+
+    const found =
+      (coverName &&
+        list.find((s) => (s.cover || "").replace(/^\/+/, "") === coverName)) ||
+      (songId &&
+        list.find((s) => [s.id, s._id, s.songId, s.sid].includes(songId))) ||
+      list.find(
+        (s) =>
+          Utils.normalise(s.title) === normTitle &&
+          Utils.normalise(s.artist) === normArtist &&
+          (!song.difficulty || s.difficulty === song.difficulty),
+      ) ||
+      list.find(
+        (s) =>
+          Utils.normalise(s.title) === normTitle &&
+          Utils.normalise(s.artist) === normArtist,
+      ) ||
+      list.find((s) => Utils.normalise(s.title) === normTitle) ||
+      null;
+
+    State.v2Cache.set(key, found);
+    return found;
+  },
+};
+
+// ─────────────────────────────────────────────
+// FILTER SERVICE
+// ─────────────────────────────────────────────
+const FilterService = {
+  /** Return filtered + sorted copy of State.songs */
+  getFiltered() {
+    const search = DOM.searchInput.value.toLowerCase();
+    const diffs = Array.from(DOM.diffCheckboxes())
+      .filter((cb) => cb.checked)
+      .map((cb) => Utils.normalise(cb.value));
+    const newOld = DOM.filterNewOld.value;
+    const sort = DOM.sortLevel.value;
+    const minLv = parseFloat(DOM.minLevel.value);
+    const maxLv = parseFloat(DOM.maxLevel.value);
+    const album = DOM.filterAlbum?.value || "";
+
+    let list = [...State.songs];
+
+    if (search)
+      list = list.filter(
+        (s) =>
+          s.title.toLowerCase().includes(search) ||
+          s.artist.toLowerCase().includes(search),
+      );
+
+    if (diffs.length)
+      list = list.filter((s) => diffs.includes(Utils.normalise(s.difficulty)));
+
+    if (newOld === "new") list = list.filter((s) => s.b15 === true);
+    else if (newOld === "old") list = list.filter((s) => !s.b15);
+
+    if (album)
+      list = list.filter(
+        (s) => Utils.normalise(s.album) === Utils.normalise(album),
+      );
+
+    if (!isNaN(minLv)) list = list.filter((s) => s.level >= minLv);
+    if (!isNaN(maxLv)) list = list.filter((s) => s.level <= maxLv);
+
+    switch (sort) {
+      case "level_asc":
+        list.sort((a, b) => a.level - b.level);
+        break;
+      case "level_desc":
+        list.sort((a, b) => b.level - a.level);
+        break;
+      case "notes_asc":
+        list.sort((a, b) => (a.notes || 0) - (b.notes || 0));
+        break;
+      case "notes_desc":
+        list.sort((a, b) => (b.notes || 0) - (a.notes || 0));
+        break;
+      case "version_asc":
+        list.sort((a, b) => Utils.versionCompare(a.version, b.version, true));
+        break;
+      case "version_desc":
+        list.sort((a, b) => Utils.versionCompare(a.version, b.version, false));
+        break;
+    }
+
+    return list;
+  },
+};
+
+// ─────────────────────────────────────────────
+// RENDERER
+// ─────────────────────────────────────────────
+const Renderer = {
+  /** Batched render — collapses multiple calls in same frame */
+  scheduleRender() {
+    if (State.renderPending) return;
+    State.renderPending = true;
+    requestAnimationFrame(() => {
+      State.renderPending = false;
+      this.renderSongs();
+    });
+  },
+
+  renderSongs() {
+    if (State.viewMode === "table") this._renderTable();
+    else this._renderGrid();
+  },
+
+  // ── Grid ──────────────────────────────────
+  _renderGrid() {
+    const { pageData, totalPages } = this._paginate();
+
+    DOM.songList.innerHTML = "";
+    DOM.songTable.style.display = "none";
+    DOM.songList.style.display = "grid";
+
+    for (const song of pageData) {
+      DOM.songList.appendChild(this._buildGridCard(song));
+    }
+
+    this._updatePaginationInfo(totalPages);
+    this._applyMarquee();
+  },
+
+  _buildGridCard(song) {
+    const div = document.createElement("div");
+    div.className = "song-item";
+    div.onclick = () => this.showModal(song);
+
+    if (song.b15) {
+      const badge = document.createElement("span");
+      badge.className = "badge new";
+      badge.textContent = "NEW";
+      div.appendChild(badge);
+    }
+
+    const img = this._buildImg(song, "");
+    div.appendChild(img);
+
+    // Title
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "song-title-container";
+    titleWrap.appendChild(this._buildMarqueeEl("h4", "song-title", song.title));
+    div.appendChild(titleWrap);
+
+    // Artist
+    const artistEl = this._buildMarqueeEl(
+      "p",
+      "marquee-text artist-text",
+      song.artist,
+    );
+    div.appendChild(artistEl);
+
+    // Level row
+    div.appendChild(this._buildLevelRow(song));
+
+    return div;
+  },
+
+  // ── Table ─────────────────────────────────
+  _renderTable() {
+    const { pageData, totalPages } = this._paginate();
+
+    DOM.songList.style.display = "none";
+    DOM.songTable.style.display = "table";
+
+    const tbody = DOM.songTable.querySelector("tbody");
+    tbody.innerHTML = "";
+
+    for (const song of pageData) {
+      tbody.appendChild(this._buildTableRow(song));
+    }
+
+    this._updatePaginationInfo(totalPages);
+    this._applyMarquee();
+  },
+
+  _buildTableRow(song) {
+    const row = document.createElement("tr");
+    row.style.cursor = "pointer";
+    row.onclick = () => this.showModal(song);
+
+    const cells = [
+      (() => {
+        const td = document.createElement("td");
+        td.appendChild(this._buildImg(song, "table-cover"));
+        return td;
+      })(),
+      this._td(Utils.escapeHtml(song.title), true),
+      this._td(Utils.escapeHtml(song.artist), true),
+      (() => {
+        const td = document.createElement("td");
+        td.innerHTML = `<span class="badge ${(song.difficulty || "").toLowerCase()}">${Utils.escapeHtml(song.difficulty || "N/A")}</span>`;
+        return td;
+      })(),
+      this._td(`Lv ${song.level}`),
+      this._td(song.notes || "N/A"),
+      this._td(song.bpm || "N/A"),
+      this._td(Utils.escapeHtml(song.version) || "N/A", true),
+    ];
+
+    cells.forEach((td) => row.appendChild(td));
+    return row;
+  },
+
+  _td(content, isHtml = false) {
+    const td = document.createElement("td");
+    if (isHtml) td.innerHTML = content;
+    else td.textContent = content;
+    return td;
+  },
+
+  // ── Modal ─────────────────────────────────
+  showModal(song) {
+    DOM.modalCard.innerHTML = "";
+    const card = document.createElement("div");
+    card.className = "result-card";
+
+    card.appendChild(this._buildImg(song, ""));
+
+    const h4 = document.createElement("h4");
+    h4.style.cssText = "margin: 5px 0 2px 0;";
+    h4.innerHTML = Utils.escapeHtml(song.title);
+    card.appendChild(h4);
+
+    const artist = document.createElement("p");
+    artist.style.cssText = "margin: 0 0 12px 0; font-size: 12px; color: #666;";
+    artist.innerHTML = Utils.escapeHtml(song.artist);
+    card.appendChild(artist);
+
+    card.appendChild(this._buildLevelRow(song));
+
+    // Info rows
+    const info = document.createElement("div");
+    info.style.cssText =
+      "margin-top: 12px; font-size: 12px; color: #cbd5f5; text-align: left; width: 100%;";
+
+    const rows = [
+      [
+        `<strong>Genre:</strong> ${Utils.escapeHtml(song.genre) || "N/A"}`,
+        `<strong>BPM:</strong> ${Utils.escapeHtml(song.bpm) || "N/A"}`,
+      ],
+      [
+        `<strong>Notes:</strong> ${song.notes || "N/A"}`,
+        `<strong>Album:</strong> ${Utils.escapeHtml(song.album) || "N/A"}`,
+      ],
+      [`<strong>Version:</strong> ${Utils.escapeHtml(song.version) || "N/A"}`],
+    ];
+
+    for (const cols of rows) {
+      const row = document.createElement("div");
+      row.style.cssText =
+        "display: flex; justify-content: space-between; margin: 6px 0; gap: 12px;";
+      row.innerHTML = cols.map((c) => `<span>${c}</span>`).join("");
+      info.appendChild(row);
+    }
+    card.appendChild(info);
+
+    const btn = document.createElement("button");
+    btn.style.marginTop = "10px";
+    btn.className = "btn btn-primary";
+    btn.textContent = "Pick this song";
+    btn.addEventListener("click", () => UI.pickSong(song));
+    card.appendChild(btn);
+
+    DOM.modalCard.appendChild(card);
+    window.selectedSong = song;
+    DOM.modal.classList.add("show");
+  },
+
+  closeModal() {
+    DOM.modal.classList.remove("show");
+  },
+
+  // ── Pagination ────────────────────────────
+  _paginate() {
+    const filtered = FilterService.getFiltered();
+    const totalPages = Math.max(
+      1,
+      Math.ceil(filtered.length / Config.PAGE_SIZE),
+    );
+    if (State.currentPage > totalPages) State.currentPage = totalPages;
+
+    const start = (State.currentPage - 1) * Config.PAGE_SIZE;
+    const pageData = filtered.slice(start, start + Config.PAGE_SIZE);
+    return { pageData, totalPages, total: filtered.length };
+  },
+
+  _updatePaginationInfo(totalPages) {
+    DOM.pageInfo.textContent = `Page ${State.currentPage} / ${totalPages}`;
+    this._renderPaginationButtons(totalPages);
+  },
+
+  _renderPaginationButtons(totalPages) {
+    DOM.paginationBtns.innerHTML = "";
+    if (totalPages <= 1) return;
+
+    const cp = State.currentPage;
+    let pages = [];
+
+    if (totalPages <= 7) {
+      pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+    } else if (cp <= 4) {
+      pages = [1, 2, 3, 4, 5, "…", totalPages];
+    } else if (cp >= totalPages - 3) {
+      pages = [
+        1,
+        "…",
+        totalPages - 4,
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+    } else {
+      pages = [1, "…", cp - 1, cp, cp + 1, "…", totalPages];
+    }
+
+    for (const p of pages) {
+      if (p === "…") {
+        const sep = document.createElement("span");
+        sep.className = "page-separator";
+        sep.textContent = "…";
+        DOM.paginationBtns.appendChild(sep);
+        continue;
+      }
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = p;
+      btn.className = p === cp ? "page-btn active" : "page-btn";
+      btn.onclick = () => {
+        if (State.currentPage !== p) {
+          State.currentPage = p;
+          this.renderSongs();
+        }
+      };
+      DOM.paginationBtns.appendChild(btn);
+    }
+  },
+
+  // ── Shared helpers ─────────────────────────
+  _buildImg(song, className) {
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    if (className) img.className = className;
+    img.src = song.cover ? ImageService.getCoverUrl(song) : Config.DEFAULT_IMG;
+    ImageService.attachFallback(img, song);
+    return img;
+  },
+
+  _buildLevelRow(song) {
+    const row = document.createElement("div");
+    row.className = "song-level";
+
+    const diff = document.createElement("span");
+    diff.className = `badge ${(song.difficulty || "").toLowerCase()}`;
+    diff.style.textTransform = "capitalize";
+    diff.textContent = song.difficulty || "N/A";
+    row.appendChild(diff);
+
+    const lv = document.createElement("span");
+    lv.textContent = `Lv ${song.level}`;
+    row.appendChild(lv);
+
+    return row;
+  },
+
+  _buildMarqueeEl(tag, className, text) {
+    const el = document.createElement(tag);
+    el.className = className;
+    el.setAttribute("data-text", Utils.escapeHtml(text));
+    const span = document.createElement("span");
+    span.innerHTML = Utils.escapeHtml(text);
+    el.appendChild(span);
+    return el;
+  },
+
+  // ── Marquee ───────────────────────────────
+  _applyMarquee() {
+    setTimeout(() => {
+      document.querySelectorAll(".song-title, .marquee-text").forEach((el) => {
+        const container = el.parentElement;
+        const inner = el.querySelector("span");
+        if (!inner) return;
+
+        const textW = inner.scrollWidth;
+        const contW = container.clientWidth;
+        const raw = el.getAttribute("data-text") || "";
+
+        if (textW > contW) {
+          const dur = Math.max(6, Math.round((textW + contW) / 70));
+          el.classList.add("marquee-animate");
+          el.style.animationDuration = `${dur}s`;
+          el.style.textAlign = "left";
+          el.innerHTML = `<span style="display:inline-block;padding-right:48px;">${raw}</span><span style="display:inline-block;">${raw}</span>`;
+        } else {
+          el.classList.remove("marquee-animate");
+          el.style.animationDuration = "";
+          el.style.transform = "";
+          el.innerHTML = `<span>${raw}</span>`;
+          el.style.textAlign = "center";
+        }
+      });
+    }, 150);
+  },
+};
+
+// ─────────────────────────────────────────────
+// CALCULATOR
+// ─────────────────────────────────────────────
+const Calculator = {
+  /** Map score → rank image path */
+  getRankImg(score) {
+    const ranks = [
+      [800000, "rank_D"],
+      [850000, "rank_C"],
+      [900000, "rank_B"],
+      [930000, "rank_A"],
+      [950000, "rank_A+"],
+      [970000, "rank_AA"],
+      [980000, "rank_AA+"],
+      [990000, "rank_AAA"],
+      [1000000, "rank_AAA+"],
+      [1009000, "rank_INF"],
+    ];
+    const match = ranks.find(([threshold]) => score < threshold);
+    const name = match ? match[1] : "rank_INF+";
+    return `./asset/rank/${name}.webp`;
+  },
+
+  /** Trend offset for score — game logic, do not modify */
+  getTrend(score) {
+    if (score < 900000) return -9;
+    if (score < 930000) return -6;
+    if (score < 950000) return -5;
+    if (score < 970000) return -4;
+    if (score < 980000) return -3;
+    if (score < 990000) return -2;
+    if (score < 1000000) return -1;
+    if (score < 1009000) return 0;
+    return 1;
+  },
+
+  /** Compute final rating point */
+  compute(constant, score) {
+    const trend = this.getTrend(score);
+    if (score >= 1009000)
+      return (
+        constant * 10 + 6 + Math.pow((score - 1009000) / 1000, 1.35) * 3 + trend
+      );
+    if (score >= 1000000)
+      return constant * 10 + ((score / 10000 - 100) * 20) / 3 + trend;
+    return constant * 10 * Math.pow(score / 1000000, 1.5) + trend;
+  },
+
+  /** Entry point — called from HTML onclick */
+  calculate() {
+    const constant = parseFloat(DOM.constantInput.value);
+    const score = parseFloat(DOM.scoreInput.value);
+
+    if (isNaN(constant) || isNaN(score)) {
+      alert("Please fill in all fields!");
+      return;
+    }
+    if (score < 0 || score > 1010000) {
+      alert("Score must be between 0 and 1,010,000!");
+      return;
+    }
+
+    const result = this.compute(constant, score);
+
+    DOM.rankEl.innerHTML = `Rank: <img src="${this.getRankImg(score)}" alt="Rank" style="height:25px;">`;
+    DOM.resultEl.textContent = "Result: " + result.toFixed(2);
+
+    this._renderResultCard();
+    DOM.calcResult.style.display = "flex";
+  },
+
+  _renderResultCard() {
+    const song = State.selectedSong;
+    if (!song || !State.selectedCover) {
+      this._clearResultCard();
+      return;
+    }
+
+    ImageService.attachFallback(DOM.songCover, song);
+    DOM.songCover.src = State.selectedCover;
     DOM.songCover.style.display = "flex";
-    DOM.songTitle.textContent = selectedSongInfo.title;
-    DOM.songArtist.textContent = selectedSongInfo.artist;
-    DOM.songNotes.textContent = selectedSongInfo.notes || "N/A";
-    DOM.songBPM.textContent = selectedSongInfo.bpm || "N/A";
-    DOM.songAlbum.textContent = selectedSongInfo.album || "N/A";
-  } else {
+
+    DOM.songTitle.setAttribute("data-text", Utils.escapeHtml(song.title));
+    DOM.songTitle.innerHTML = `<span>${Utils.escapeHtml(song.title)}</span>`;
+    DOM.songArtist.textContent = song.artist || "";
+
+    DOM.resultDifficulty.textContent = song.difficulty || "N/A";
+    DOM.resultDifficulty.className = `badge ${(song.difficulty || "").toLowerCase()}`;
+    DOM.resultLevel.textContent = `Lv ${song.level}`;
+
+    DOM.songNotes.textContent = song.notes || "N/A";
+    DOM.songBPM.textContent = song.bpm || "N/A";
+
+    const album = Utils.escapeHtml(song.album || "N/A");
+    DOM.songAlbum.setAttribute("data-text", album);
+    DOM.songAlbum.innerHTML = `<span>${album}</span>`;
+
+    Renderer._applyMarquee();
+  },
+
+  _clearResultCard() {
     DOM.songCover.style.display = "none";
     DOM.songTitle.textContent = "";
     DOM.songArtist.textContent = "";
+    DOM.resultDifficulty.textContent = "";
+    DOM.resultDifficulty.className = "badge";
+    DOM.resultLevel.textContent = "";
     DOM.songNotes.textContent = "";
     DOM.songBPM.textContent = "";
     DOM.songAlbum.textContent = "";
-  }
-  DOM.calcResult.style.display = "flex";
-}
+  },
+};
 
-// ===== AUTO-SUGGEST FOR CALCULATOR =====
-function fillConstant() {
-  const name = DOM.songNameInput.value.toLowerCase();
-  const diff = DOM.difficultySelect.value;
-  const song = songData.find(
-    (s) => s.title.toLowerCase() === name && s.difficulty === diff,
-  );
-  if (song) {
+// ─────────────────────────────────────────────
+// UI — navigation, suggestions, roulette, etc.
+// ─────────────────────────────────────────────
+const UI = {
+  // ── Page navigation ───────────────────────
+  switchPage(pageId) {
+    document
+      .querySelectorAll(".page")
+      .forEach((p) => p.classList.remove("active"));
+    document.getElementById(pageId)?.classList.add("active");
+  },
+
+  _setActiveMenuBtn(btn) {
+    document
+      .querySelectorAll(".menu button")
+      .forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+  },
+
+  // ── View mode ─────────────────────────────
+  setViewMode(mode) {
+    State.viewMode = mode;
+    State.currentPage = 1;
+    document
+      .querySelectorAll(".view-mode-btn")
+      .forEach((b) => b.classList.remove("active"));
+    document.querySelector(`[data-view="${mode}"]`)?.classList.add("active");
+    Renderer.renderSongs();
+  },
+
+  // ── Filters ───────────────────────────────
+  resetPageAndRender() {
+    State.currentPage = 1;
+    Renderer.renderSongs();
+  },
+
+  // ── Pagination helpers ────────────────────
+  nextPage() {
+    const total = Math.ceil(
+      FilterService.getFiltered().length / Config.PAGE_SIZE,
+    );
+    if (State.currentPage < total) {
+      State.currentPage++;
+      Renderer.renderSongs();
+    }
+  },
+
+  prevPage() {
+    if (State.currentPage > 1) {
+      State.currentPage--;
+      Renderer.renderSongs();
+    }
+  },
+
+  // ── Difficulty dropdown ───────────────────
+  toggleDiffDropdown() {
+    const dd = document.getElementById("difficultyDropdown");
+    if (dd) dd.style.display = dd.style.display === "block" ? "none" : "block";
+  },
+
+  // ── Album dropdown ────────────────────────
+  /**
+   * Populate #filterAlbum <select> with sorted unique album names from State.songs.
+   * Called once after songs are loaded, and again if songs change.
+   */
+  buildAlbumDropdown() {
+    const select = DOM.filterAlbum;
+    if (!select) return;
+
+    const current = select.value; // preserve selection across rebuilds
+
+    // Collect unique, non-empty album names
+    const albums = [
+      ...new Set(
+        State.songs.map((s) => (s.album || "").trim()).filter(Boolean),
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+
+    select.innerHTML = '<option value="">All Albums</option>';
+    for (const album of albums) {
+      const opt = document.createElement("option");
+      opt.value = album;
+      opt.textContent = album;
+      if (album === current) opt.selected = true;
+      select.appendChild(opt);
+    }
+  },
+
+  // ── Calculator suggestions ────────────────
+  showSuggestions(list) {
+    DOM.suggestionsDiv.innerHTML = "";
+    // dedupe by title
+    const unique = [...new Map(list.map((s) => [s.title, s])).values()].slice(
+      0,
+      Config.SUGGESTIONS,
+    );
+
+    for (const song of unique) {
+      const item = document.createElement("div");
+      item.textContent = song.title;
+      item.onclick = () => {
+        DOM.songNameInput.value = song.title;
+        DOM.suggestionsDiv.style.display = "none";
+        this._fillConstant();
+      };
+      DOM.suggestionsDiv.appendChild(item);
+    }
+    DOM.suggestionsDiv.style.display = unique.length ? "block" : "none";
+  },
+
+  _fillConstant() {
+    const name = DOM.songNameInput.value.toLowerCase();
+    const diff = DOM.difficultySelect.value;
+    const song = State.songs.find(
+      (s) => s.title.toLowerCase() === name && s.difficulty === diff,
+    );
+    if (song) {
+      DOM.constantInput.value = song.level;
+      State.selectedCover = song.cover
+        ? ImageService.getCoverUrl(song)
+        : Config.DEFAULT_IMG;
+      State.selectedSong = song;
+    }
+  },
+
+  // ── Pick song from modal → calc ───────────
+  pickSong(song) {
+    this.switchPage("calc");
+    DOM.songNameInput.value = song.title;
+    DOM.difficultySelect.value = song.difficulty;
     DOM.constantInput.value = song.level;
-    selectedCover = song.cover ? `${COVER_BASE}/${song.cover}` : DEFAULT_IMG;
-    selectedSongInfo = song;
-  }
-}
+    State.selectedCover = song.cover
+      ? ImageService.getCoverUrl(song)
+      : Config.DEFAULT_IMG;
+    State.selectedSong = song;
+    Renderer.closeModal();
+  },
 
-function showSuggestions(list) {
-  DOM.suggestionsDiv.innerHTML = "";
-  const unique = [...new Map(list.map((s) => [s.title, s])).values()];
-  unique.slice(0, 10).forEach((song) => {
-    const div = document.createElement("div");
-    div.textContent = song.title;
-    div.onclick = () => {
-      DOM.songNameInput.value = song.title;
-      DOM.suggestionsDiv.style.display = "none";
-      fillConstant();
-    };
-    DOM.suggestionsDiv.appendChild(div);
-  });
-  DOM.suggestionsDiv.style.display = "block";
-}
+  // ── Roulette ──────────────────────────────
+  async randomSong() {
+    const list = FilterService.getFiltered();
+    if (!list.length) {
+      alert("No songs match your criteria!");
+      return;
+    }
 
-const handleSearchInput = debounce(() => {
-  const keyword = DOM.songNameInput.value.toLowerCase();
-  if (!keyword) {
-    DOM.suggestionsDiv.style.display = "none";
-    return;
-  }
-  const results = songData.filter((s) =>
-    s.title.toLowerCase().includes(keyword),
-  );
-  showSuggestions(results);
-}, 300);
+    DOM.rouletteBox.classList.add("show");
 
-// ===== FILTER CHANGE HANDLERS (debounced for range inputs) =====
-function refreshList() {
-  currentPage = 1;
-  renderSongs();
-}
+    let elapsed = 0;
+    let intervalTime = 50;
+    const duration = 2000;
 
-const debouncedRefresh = debounce(refreshList, 150);
-DOM.searchInput.addEventListener("input", refreshList);
-DOM.filterDifficultyInputs.forEach((checkbox) =>
-  checkbox.addEventListener("change", refreshList),
-);
-DOM.filterNewOld.addEventListener("change", refreshList);
-DOM.sortLevel.addEventListener("change", refreshList);
-DOM.minLevel.addEventListener("input", debouncedRefresh);
-DOM.maxLevel.addEventListener("input", debouncedRefresh);
+    const tick = setInterval(() => {
+      const rand = list[Math.floor(Math.random() * list.length)];
+      DOM.rouletteText.textContent = `${rand.title} - ${rand.difficulty} Lv ${rand.level}`;
+      elapsed += intervalTime;
+      intervalTime += 15;
 
-// ===== PAGINATION CONTROLS =====
-function nextPage() {
-  const totalPages = Math.ceil(getFilteredSongs().length / ITEMS_PER_PAGE);
-  if (currentPage < totalPages) {
-    currentPage++;
-    renderSongs();
-  }
-}
+      if (elapsed >= duration) {
+        clearInterval(tick);
+        DOM.rouletteBox.classList.remove("show");
+        Renderer.showModal(list[Math.floor(Math.random() * list.length)]);
+      }
+    }, intervalTime);
+  },
+};
 
-function prevPage() {
-  if (currentPage > 1) {
-    currentPage--;
-    renderSongs();
-  }
-}
-
-// ===== CLOSE MODAL ON OUTSIDE CLICK =====
-DOM.modal.addEventListener("click", (e) => {
-  if (e.target === DOM.modal) closeSongDetailModal();
-});
-
-// ===== INIT =====
+// ─────────────────────────────────────────────
+// INIT — wire everything together
+// ─────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  loadSongs();
-  DOM.songNameInput.addEventListener("input", handleSearchInput);
-  DOM.difficultySelect.addEventListener("change", fillConstant);
-  // Expose necessary globals for HTML onclick
-  window.nextPage = nextPage;
-  window.prevPage = prevPage;
-  window.randomSong = randomSong;
-  window.calculate = calculate;
-  window.pickThisSong = pickThisSong;
-  window.closeSongDetailModal = closeSongDetailModal;
-  window.switchPage = switchPage; // fallback if needed
+  // Load data
+  ApiService.loadSongs();
+
+  // Menu buttons
+  document.querySelectorAll(".menu button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const pageId = btn.getAttribute("data-page");
+      if (pageId) UI.switchPage(pageId);
+      UI._setActiveMenuBtn(btn);
+    });
+  });
+
+  // Filter listeners
+  const debouncedRefresh = Utils.debounce(() => UI.resetPageAndRender(), 150);
+  DOM.searchInput.addEventListener("input", () => UI.resetPageAndRender());
+  DOM.filterNewOld.addEventListener("change", () => UI.resetPageAndRender());
+  DOM.sortLevel.addEventListener("change", () => UI.resetPageAndRender());
+  DOM.minLevel.addEventListener("input", debouncedRefresh);
+  DOM.maxLevel.addEventListener("input", debouncedRefresh);
+  DOM.diffCheckboxes().forEach((cb) =>
+    cb.addEventListener("change", () => UI.resetPageAndRender()),
+  );
+
+  // Album filter
+  if (DOM.filterAlbum) {
+    DOM.filterAlbum.addEventListener("change", () => UI.resetPageAndRender());
+  }
+
+  // Calculator autocomplete
+  const debouncedSuggest = Utils.debounce(() => {
+    const kw = DOM.songNameInput.value.toLowerCase();
+    if (!kw) {
+      DOM.suggestionsDiv.style.display = "none";
+      return;
+    }
+    UI.showSuggestions(
+      State.songs.filter((s) => s.title.toLowerCase().includes(kw)),
+    );
+  }, 300);
+
+  DOM.songNameInput.addEventListener("input", debouncedSuggest);
+  DOM.difficultySelect.addEventListener("change", () => UI._fillConstant());
+
+  // Close modal on outside click
+  DOM.modal.addEventListener("click", (e) => {
+    if (e.target === DOM.modal) Renderer.closeModal();
+  });
+
+  // Close difficulty dropdown on outside click
+  document.addEventListener("click", (e) => {
+    const dd = document.getElementById("difficultyDropdown");
+    const btn = document.querySelector(".select-button");
+    if (!dd || !btn) return;
+    if (!btn.contains(e.target) && !dd.contains(e.target)) {
+      dd.style.display = "none";
+    }
+  });
+
+  // ── Expose globals for HTML onclick attributes ──
+  Object.assign(window, {
+    calculate: () => Calculator.calculate(),
+    randomSong: () => UI.randomSong(),
+    pickThisSong: () => UI.pickSong(window.selectedSong),
+    closeSongDetailModal: () => Renderer.closeModal(),
+    switchPage: (id) => UI.switchPage(id),
+    toggleViewMode: (m) => UI.setViewMode(m),
+    toggleDifficultyDropdown: () => UI.toggleDiffDropdown(),
+    nextPage: () => UI.nextPage(),
+    prevPage: () => UI.prevPage(),
+  });
 });
