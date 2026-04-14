@@ -830,7 +830,7 @@ const Calculator = {
     if (DOM.requiredScore) DOM.requiredScore.textContent = req.toString();
     if (DOM.requiredScoreBlock) DOM.requiredScoreBlock.style.display = "block";
     DOM.rankEl.innerHTML = `Rank: <img src="${this.getRankImg(req)}" alt="Rank" style="height:25px;">`;
-    DOM.resultEl.textContent = "Target: " + target.toFixed(2);
+    DOM.resultEl.textContent = target;
 
     this._renderResultCard();
     DOM.calcResult.style.display = "flex";
@@ -853,10 +853,10 @@ const Calculator = {
       return;
     }
 
-    const result = this.compute(constant, score);
+    const result = Math.floor(this.compute(constant, score) * 10000) / 10000; // round to 4 decimals
 
     DOM.rankEl.innerHTML = `Rank: <img src="${this.getRankImg(score)}" alt="Rank" style="height:25px;">`;
-    DOM.resultEl.textContent = "Result: " + result.toFixed(2);
+    DOM.resultEl.textContent = "Result: " + result;
 
     this._renderResultCard();
     DOM.calcResult.style.display = "flex";
