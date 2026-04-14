@@ -557,8 +557,8 @@ const Renderer = {
         `<strong>BPM:</strong> ${Utils.escapeHtml(song.bpm) || "N/A"}`,
       ],
       [
-        `<strong>Notes:</strong> ${song.notes || "N/A"}`,
         `<strong>Album:</strong> ${Utils.escapeHtml(song.album) || "N/A"}`,
+        `<strong>Notes:</strong> ${song.notes || "N/A"}`,
       ],
       [`<strong>Version:</strong> ${Utils.escapeHtml(song.version) || "N/A"}`],
     ];
@@ -571,6 +571,25 @@ const Renderer = {
       info.appendChild(row);
     }
     card.appendChild(info);
+
+    // YouTube search button (opens a new tab searching for chartview of this song)
+    const youtubeBtn = document.createElement("button");
+    youtubeBtn.type = "button";
+    youtubeBtn.style.marginTop = "10px";
+    youtubeBtn.style.marginRight = "8px";
+    youtubeBtn.className = "btn btn-youtube";
+    youtubeBtn.title = "Search chartview on YouTube";
+    youtubeBtn.innerHTML =
+      '<i class="fab fa-youtube fa-brands" aria-hidden="true" style="vertical-align:middle;margin-right:6px;color:#FF0000;font-size:15px"></i> YouTube';
+    youtubeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const q =
+        `Paradigm: Reboot ${song.title || ""} ${song.difficulty || ""} ${Math.trunc(song.level) || ""} chartview`.trim();
+      const url =
+        "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
+    card.appendChild(youtubeBtn);
 
     const btn = document.createElement("button");
     btn.style.marginTop = "10px";

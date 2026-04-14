@@ -818,8 +818,8 @@ body {
   background: var(--bg-card);
   padding: 20px;
   border-radius: 16px;
-  width: 90%;
-  max-width: 360px;
+  width: 100%;
+  max-width: 400px;
   position: relative;
   animation: popup 0.3s ease;
 }
@@ -903,7 +903,7 @@ body {
 
 .result-card img {
   width: 100%;
-  max-width: 200px;
+  max-width: 220px;
   border-radius: 10px;
   margin-bottom: 12px;
 }
