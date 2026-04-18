@@ -18,10 +18,12 @@
 // CONFIG
 // ─────────────────────────────────────────────
 const Config = Object.freeze({
-  API_V1: "https://api.prp.icel.site/api/v1/songs",
-  API_V2: "https://api.prp-test.icel.site/api/v2/songs",
+  // API_V1: "https://api.prp.icel.site/api/v1/songs",
+  // API_V1: "http://localhost:8080/api/v1/songs",
+  API_V1: "https://api.prp.icel.site/api/v2/songs",
+  // COVER_V1: "http://localhost:8080/covers",
+  // COVER_V1: "https://prp-web-v2-f4ty2hjgt-icelocke.vercel.app/cover",
   COVER_V1: "https://prp.icel.site/cover",
-  COVER_V2: "https://prp-web-v2-f4ty2hjgt-icelocke.vercel.app/cover",
   DEFAULT_IMG: "./asset/no-image.jpg",
   PAGE_SIZE: 36,
   MAX_FALLBACKS: 3,
@@ -183,7 +185,7 @@ const ImageService = {
     imgEl.onerror = () => this.handleError(imgEl, song).catch(() => {});
   },
 
-  /** Multi-stage fallback: v1 → v2 direct → v2 lookup → default */
+  /** Fallback: do not call external v2 APIs — only use v1 data. */
   async handleError(imgEl, song) {
     if (!imgEl || imgEl.dataset.fallbackDone) return;
 
@@ -193,53 +195,8 @@ const ImageService = {
     }
     imgEl.dataset.fallbackAttempts = attempts + 1;
 
-    const currentSrc = imgEl.src;
-    State.failedUrls.add(currentSrc);
-
-    // Stage 1: try v2 URL directly (once per original URL)
-    if (!imgEl.dataset.triedV2Direct && song?.cover) {
-      imgEl.dataset.triedV2Direct = "1";
-      const v2Direct = this._v2Url(song.cover);
-
-      if (
-        !State.triedV2Urls.has(currentSrc) &&
-        !State.failedUrls.has(v2Direct)
-      ) {
-        State.triedV2Urls.add(currentSrc);
-        this._setSrc(imgEl, song, v2Direct);
-
-        // Background: fetch v2 metadata to update song object
-        ApiService.fetchV2Song(song)
-          .then((v2) => {
-            if (v2?.cover) {
-              song.cover = v2.cover;
-              song._v2Applied = true;
-              Renderer.scheduleRender();
-            }
-          })
-          .catch(() => {});
-        return;
-      }
-    }
-
-    // Stage 2: lookup v2 metadata and use its cover
-    try {
-      const v2 = await ApiService.fetchV2Song(song);
-      if (v2?.cover) {
-        const v2Url = this._v2Url(v2.cover);
-        if (!State.failedUrls.has(v2Url)) {
-          song.cover = v2.cover;
-          song._v2Applied = true;
-          this._setSrc(imgEl, song, v2Url);
-          Renderer.scheduleRender();
-          return;
-        }
-      }
-    } catch (_) {
-      /* fall through */
-    }
-
-    // Stage 3: give up, show default
+    // Record the failed URL and stop — do NOT attempt v2 lookups or network calls.
+    State.failedUrls.add(imgEl.src);
     this._setDefault(imgEl);
   },
 
@@ -279,63 +236,19 @@ const ApiService = {
     }
   },
 
-  /** Fetch v2 song list (shared, deduped). */
+  /** Fetch v2 song list (disabled). */
   async _ensureV2List() {
+    // v2 fetching is disabled — we only use the v1 API (localhost).
     if (State.v2List !== null) return;
-    if (!State.v2Promise) {
-      State.v2Promise = fetch(Config.API_V2)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((data) => {
-          const list = data.data ?? data ?? [];
-          State.v2List = Array.isArray(list) ? list : [];
-        })
-        .catch((err) => {
-          console.warn("[ApiService] v2 list fetch failed:", err);
-          State.v2List = [];
-        });
-    }
+    State.v2List = [];
+    State.v2Promise = Promise.resolve();
     await State.v2Promise;
   },
 
-  /** Find v2 match for a song object. Results are cached. */
-  async fetchV2Song(song) {
-    const key = `${Utils.normalise(song.title)}|${Utils.normalise(song.artist)}|${Utils.normalise(song.difficulty)}`;
-    if (State.v2Cache.has(key)) return State.v2Cache.get(key);
-
-    await this._ensureV2List();
-
-    const list = State.v2List;
-    if (!list?.length) {
-      State.v2Cache.set(key, null);
-      return null;
-    }
-
-    const coverName = (song.cover || "").replace(/^\/+/, "");
-    const songId = song.id ?? song._id ?? song.songId ?? song.sid;
-    const normTitle = Utils.normalise(song.title);
-    const normArtist = Utils.normalise(song.artist);
-
-    const found =
-      (coverName &&
-        list.find((s) => (s.cover || "").replace(/^\/+/, "") === coverName)) ||
-      (songId &&
-        list.find((s) => [s.id, s._id, s.songId, s.sid].includes(songId))) ||
-      list.find(
-        (s) =>
-          Utils.normalise(s.title) === normTitle &&
-          Utils.normalise(s.artist) === normArtist &&
-          (!song.difficulty || s.difficulty === song.difficulty),
-      ) ||
-      list.find(
-        (s) =>
-          Utils.normalise(s.title) === normTitle &&
-          Utils.normalise(s.artist) === normArtist,
-      ) ||
-      list.find((s) => Utils.normalise(s.title) === normTitle) ||
-      null;
-
-    State.v2Cache.set(key, found);
-    return found;
+  /** Find v2 match for a song object. Disabled: always returns null. */
+  async fetchV2Song(/* song */) {
+    // v2 is disabled — do not perform network calls to other APIs.
+    return null;
   },
 };
 
