@@ -792,6 +792,7 @@ const Calculator = {
 
     DOM.resultDifficulty.textContent = song.difficulty || "N/A";
     DOM.resultDifficulty.className = `badge ${(song.difficulty || "").toLowerCase()}`;
+    DOM.resultDifficulty.style.textTransform = "capitalize";
     DOM.resultLevel.textContent = `Lv ${song.level}`;
 
     DOM.songNotes.textContent = song.notes || "N/A";
@@ -931,7 +932,9 @@ const UI = {
     const name = DOM.songNameInput.value.toLowerCase();
     const diff = DOM.difficultySelect.value;
     const song = State.songs.find(
-      (s) => s.title.toLowerCase() === name && s.difficulty === diff,
+      (s) =>
+        s.title.toLowerCase() === name &&
+        s.difficulty.toLowerCase() === diff.toLowerCase(),
     );
     if (song) {
       DOM.constantInput.value = song.level;
