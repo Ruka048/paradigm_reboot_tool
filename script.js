@@ -73,6 +73,8 @@ const DOM = (() => {
     diffCheckboxes: () =>
       document.querySelectorAll("#difficultyDropdown input[type='checkbox']"),
     filterAlbum: $("filterAlbum"),
+    albumCheckboxes: () =>
+      document.querySelectorAll("#albumDropdown input[type='checkbox']"),
     syncLevelsBtn: $("syncLevelsBtn"),
     // Pagination
     pageInfo: $("pageInfo"),
@@ -187,7 +189,7 @@ const ImageService = {
   /** Attach onerror handler to an img element */
   attachFallback(imgEl, song) {
     if (!imgEl) return;
-    imgEl.onerror = () => this.handleError(imgEl, song).catch(() => { });
+    imgEl.onerror = () => this.handleError(imgEl, song).catch(() => {});
   },
 
   /** Fallback: do not call external v2 APIs — only use v1 data. */
@@ -208,7 +210,7 @@ const ImageService = {
   _setSrc(imgEl, song, url) {
     imgEl.onerror = null;
     imgEl.src = url;
-    imgEl.onerror = () => this.handleError(imgEl, song).catch(() => { });
+    imgEl.onerror = () => this.handleError(imgEl, song).catch(() => {});
   },
 
   _setDefault(imgEl) {
@@ -271,7 +273,10 @@ const FilterService = {
     const sort = DOM.sortLevel.value;
     const minLv = parseFloat(DOM.minLevel.value);
     const maxLv = parseFloat(DOM.maxLevel.value);
-    const album = DOM.filterAlbum?.value || "";
+    const albumChecks = DOM.albumCheckboxes ? DOM.albumCheckboxes() : [];
+    const selectedAlbums = Array.from(albumChecks)
+      .filter((cb) => cb.checked)
+      .map((cb) => Utils.normalise(cb.value));
 
     let list = [...State.songs];
 
@@ -288,9 +293,9 @@ const FilterService = {
     if (newOld === "new") list = list.filter((s) => s.b15 === true);
     else if (newOld === "old") list = list.filter((s) => !s.b15);
 
-    if (album)
-      list = list.filter(
-        (s) => Utils.normalise(s.album) === Utils.normalise(album),
+    if (selectedAlbums.length)
+      list = list.filter((s) =>
+        selectedAlbums.includes(Utils.normalise(s.album)),
       );
 
     if (!isNaN(minLv)) list = list.filter((s) => s.level >= minLv);
@@ -367,7 +372,7 @@ const Renderer = {
       reboot: "rgba(255, 165, 0, 0.2)",
       massive: "rgba(128, 0, 128, 0.25)",
       invaded: "rgba(245, 108, 108, 0.2)",
-      detected: "rgba(64, 158, 255, 0.2)"
+      detected: "rgba(64, 158, 255, 0.2)",
     };
     div.style.backgroundColor = bgColors[diff] || "var(--bg-card)";
 
@@ -465,7 +470,9 @@ const Renderer = {
     const version = Utils.escapeHtml(song.version) || "N/A";
     const title = Utils.escapeHtml(song.title);
     const artist = Utils.escapeHtml(song.artist);
-    const coverUrl = song.cover ? ImageService.getCoverUrl(song) : Config.DEFAULT_IMG;
+    const coverUrl = song.cover
+      ? ImageService.getCoverUrl(song)
+      : Config.DEFAULT_IMG;
 
     const html = `
       <div class="song-detail-container">
@@ -522,8 +529,10 @@ const Renderer = {
     // Attach events
     document.getElementById("modalPickBtn").onclick = () => UI.pickSong(song);
     document.getElementById("modalYtBtn").onclick = () => {
-      const q = `Paradigm: Reboot ${song.title} ${song.difficulty} Lv ${song.level} chartview`.trim();
-      const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
+      const q =
+        `Paradigm: Reboot ${song.title} ${song.difficulty} Lv ${song.level} chartview`.trim();
+      const url =
+        "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
       window.open(url, "_blank", "noopener,noreferrer");
     };
 
@@ -894,16 +903,20 @@ const UI = {
     if (dd) dd.style.display = dd.style.display === "block" ? "none" : "block";
   },
 
+  // ── Album dropdown ───────────────────────
+  toggleAlbumDropdown() {
+    const dd = document.getElementById("albumDropdown");
+    if (dd) dd.style.display = dd.style.display === "block" ? "none" : "block";
+  },
+
   // ── Album dropdown ────────────────────────
   /**
    * Populate #filterAlbum <select> with sorted unique album names from State.songs.
    * Called once after songs are loaded, and again if songs change.
    */
   buildAlbumDropdown() {
+    const dropdown = document.getElementById("albumDropdown");
     const select = DOM.filterAlbum;
-    if (!select) return;
-
-    const current = select.value; // preserve selection across rebuilds
 
     // Collect unique, non-empty album names
     const albums = [
@@ -912,13 +925,42 @@ const UI = {
       ),
     ].sort((a, b) => a.localeCompare(b));
 
-    select.innerHTML = '<option value="">All Albums</option>';
-    for (const album of albums) {
-      const opt = document.createElement("option");
-      opt.value = album;
-      opt.textContent = album;
-      if (album === current) opt.selected = true;
-      select.appendChild(opt);
+    if (dropdown) {
+      // preserve previous checked state
+      const prevChecked = new Set(
+        Array.from(
+          dropdown.querySelectorAll("input[type='checkbox']:checked"),
+        ).map((cb) => cb.value),
+      );
+
+      dropdown.innerHTML = "";
+      for (const album of albums) {
+        const label = document.createElement("label");
+        label.className = "checkbox-item";
+
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.value = album;
+        if (prevChecked.has(album)) input.checked = true;
+        input.addEventListener("change", () => UI.resetPageAndRender());
+
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(" " + album));
+        dropdown.appendChild(label);
+      }
+      return;
+    }
+
+    if (select) {
+      const current = select.value; // preserve selection across rebuilds
+      select.innerHTML = '<option value="">All Albums</option>';
+      for (const album of albums) {
+        const opt = document.createElement("option");
+        opt.value = album;
+        opt.textContent = album;
+        if (album === current) opt.selected = true;
+        select.appendChild(opt);
+      }
     }
   },
 
@@ -976,8 +1018,11 @@ const UI = {
 
     // Auto fill difficulty robustly (case-insensitive)
     const diffMatch = (song.difficulty || "").toLowerCase();
-    Array.from(DOM.difficultySelect.options).forEach(opt => {
-      if (opt.value.toLowerCase() === diffMatch || opt.text.toLowerCase() === diffMatch) {
+    Array.from(DOM.difficultySelect.options).forEach((opt) => {
+      if (
+        opt.value.toLowerCase() === diffMatch ||
+        opt.text.toLowerCase() === diffMatch
+      ) {
         DOM.difficultySelect.value = opt.value;
       }
     });
@@ -1083,9 +1128,7 @@ const CustomPool = {
         const oldRaw = localStorage.getItem(this.STORAGE_KEY_OLD);
         const oldPool = oldRaw ? JSON.parse(oldRaw) : [];
         const defaultId = Date.now().toString();
-        this._pools = [
-          { id: defaultId, name: "Default Pool", songs: oldPool }
-        ];
+        this._pools = [{ id: defaultId, name: "Default Pool", songs: oldPool }];
         this._activePoolId = defaultId;
       }
     } catch {
@@ -1102,7 +1145,7 @@ const CustomPool = {
     }
 
     // Validate active pool
-    if (!this._pools.find(p => p.id === this._activePoolId)) {
+    if (!this._pools.find((p) => p.id === this._activePoolId)) {
       this._activePoolId = this._pools[0].id;
     }
 
@@ -1112,10 +1155,13 @@ const CustomPool = {
 
   _save() {
     try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
-        pools: this._pools,
-        activeId: this._activePoolId
-      }));
+      localStorage.setItem(
+        this.STORAGE_KEY,
+        JSON.stringify({
+          pools: this._pools,
+          activeId: this._activePoolId,
+        }),
+      );
     } catch {
       /* quota exceeded — ignore */
     }
@@ -1124,7 +1170,7 @@ const CustomPool = {
 
   // ── Pool Management ───────────────────────
   switchPool(id) {
-    if (this._pools.find(p => p.id === id)) {
+    if (this._pools.find((p) => p.id === id)) {
       this._activePoolId = id;
       this._save();
       this.render();
@@ -1192,9 +1238,10 @@ const CustomPool = {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete the pool "${pool.name}"?`)) return;
+    if (!confirm(`Are you sure you want to delete the pool "${pool.name}"?`))
+      return;
 
-    this._pools = this._pools.filter(p => p.id !== pool.id);
+    this._pools = this._pools.filter((p) => p.id !== pool.id);
     this._activePoolId = this._pools[0].id;
     this._save();
 
@@ -1205,7 +1252,7 @@ const CustomPool = {
 
   // ── Song operations ───────────────────────
   _getActivePool() {
-    return this._pools.find(p => p.id === this._activePoolId);
+    return this._pools.find((p) => p.id === this._activePoolId);
   },
 
   _getSongKey(song) {
@@ -1213,18 +1260,21 @@ const CustomPool = {
   },
 
   poolHasSong(poolId, song) {
-    const pool = this._pools.find(p => p.id === poolId);
+    const pool = this._pools.find((p) => p.id === poolId);
     if (!pool) return false;
     const key = this._getSongKey(song);
-    return pool.songs.some(s => this._getSongKey(s) === key);
+    return pool.songs.some((s) => this._getSongKey(s) === key);
   },
 
   addToPool(poolId, song) {
-    const pool = this._pools.find(p => p.id === poolId);
+    const pool = this._pools.find((p) => p.id === poolId);
     if (!pool) return;
 
     if (pool.maxCapacity > 0 && pool.songs.length >= pool.maxCapacity) {
-      Toast.show(`Cannot add: "${pool.name}" has reached its max capacity of ${pool.maxCapacity}.`, "error");
+      Toast.show(
+        `Cannot add: "${pool.name}" has reached its max capacity of ${pool.maxCapacity}.`,
+        "error",
+      );
       return;
     }
 
@@ -1239,7 +1289,7 @@ const CustomPool = {
   },
 
   removeFromPool(poolId, song) {
-    const pool = this._pools.find(p => p.id === poolId);
+    const pool = this._pools.find((p) => p.id === poolId);
     if (!pool) return;
 
     const key = this._getSongKey(song);
@@ -1303,7 +1353,10 @@ const CustomPool = {
     let addedCount = 0;
     for (const song of list) {
       if (pool.maxCapacity > 0 && pool.songs.length >= pool.maxCapacity) {
-        Toast.show(`Capacity reached! Stopped adding at ${pool.maxCapacity} songs.`, "error");
+        Toast.show(
+          `Capacity reached! Stopped adding at ${pool.maxCapacity} songs.`,
+          "error",
+        );
         break;
       }
       if (!this.poolHasSong(pool.id, song)) {
@@ -1338,7 +1391,9 @@ const CustomPool = {
     }
 
     if (!pool.maxCapacity || pool.maxCapacity <= 0) {
-      alert(`The pool "${pool.name}" has no Max Capacity set. Random Fill only works for pools with a limit.`);
+      alert(
+        `The pool "${pool.name}" has no Max Capacity set. Random Fill only works for pools with a limit.`,
+      );
       return;
     }
 
@@ -1351,14 +1406,19 @@ const CustomPool = {
     }
 
     // Get songs from list that are NOT in pool
-    const candidates = list.filter(song => !this.poolHasSong(pool.id, song));
+    const candidates = list.filter((song) => !this.poolHasSong(pool.id, song));
     if (!candidates.length) {
       alert("All songs in the filtered list are already in the pool!");
       return;
     }
 
     const countToPick = Math.min(availableSlots, candidates.length);
-    if (!confirm(`Randomly add ${countToPick} song(s) from current list to "${pool.name}"?`)) return;
+    if (
+      !confirm(
+        `Randomly add ${countToPick} song(s) from current list to "${pool.name}"?`,
+      )
+    )
+      return;
 
     // Shuffle candidates
     const shuffled = [...candidates].sort(() => Math.random() - 0.5);
@@ -1370,7 +1430,10 @@ const CustomPool = {
 
     if (toAdd.length > 0) {
       this._save();
-      Toast.show(`Added ${toAdd.length} random song(s) to ${pool.name}!`, "success");
+      Toast.show(
+        `Added ${toAdd.length} random song(s) to ${pool.name}!`,
+        "success",
+      );
       if (document.getElementById("pool").classList.contains("active")) {
         this.render();
       }
@@ -1382,10 +1445,14 @@ const CustomPool = {
     if (!active) return;
 
     // exclude banned and picked
-    const available = active.songs.filter(s => s._poolStatus !== "ban" && s._poolStatus !== "pick");
+    const available = active.songs.filter(
+      (s) => s._poolStatus !== "ban" && s._poolStatus !== "pick",
+    );
 
     if (!available.length) {
-      alert("No available songs to choose from! (All are banned or picked, or pool is empty)");
+      alert(
+        "No available songs to choose from! (All are banned or picked, or pool is empty)",
+      );
       return;
     }
 
@@ -1404,7 +1471,8 @@ const CustomPool = {
       if (elapsed >= duration) {
         clearInterval(tick);
         DOM.rouletteBox.classList.remove("show");
-        const finalSong = available[Math.floor(Math.random() * available.length)];
+        const finalSong =
+          available[Math.floor(Math.random() * available.length)];
 
         // Automatically mark the randomized result as "picked"
         finalSong._poolStatus = "pick";
@@ -1426,7 +1494,7 @@ const CustomPool = {
     for (const pool of this._pools) {
       const opt = document.createElement("option");
       opt.value = pool.id;
-      const capText = pool.maxCapacity > 0 ? `/${pool.maxCapacity}` : '';
+      const capText = pool.maxCapacity > 0 ? `/${pool.maxCapacity}` : "";
       opt.textContent = `${pool.name} (${pool.songs.length}${capText})`;
       if (pool.id === this._activePoolId) opt.selected = true;
       selector.appendChild(opt);
@@ -1445,10 +1513,10 @@ const CustomPool = {
     // Also update selector counts
     const selector = document.getElementById("poolSelector");
     if (selector) {
-      Array.from(selector.options).forEach(opt => {
-        const pool = this._pools.find(p => p.id === opt.value);
+      Array.from(selector.options).forEach((opt) => {
+        const pool = this._pools.find((p) => p.id === opt.value);
         if (pool) {
-          const capText = pool.maxCapacity > 0 ? `/${pool.maxCapacity}` : '';
+          const capText = pool.maxCapacity > 0 ? `/${pool.maxCapacity}` : "";
           opt.textContent = `${pool.name} (${pool.songs.length}${capText})`;
         }
       });
@@ -1473,8 +1541,7 @@ const CustomPool = {
 
     return active.songs.filter(
       (s) =>
-        s.title.toLowerCase().includes(q) ||
-        s.artist.toLowerCase().includes(q),
+        s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q),
     );
   },
 
@@ -1521,7 +1588,7 @@ const CustomPool = {
       // Pick button
       const pickBtn = document.createElement("button");
       pickBtn.className = "pool-pick-btn";
-      pickBtn.title = (song._poolStatus === "pick") ? "Unpick" : "Pick";
+      pickBtn.title = song._poolStatus === "pick" ? "Unpick" : "Pick";
       pickBtn.innerHTML = '<i class="fas fa-check"></i>';
       pickBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -1532,7 +1599,7 @@ const CustomPool = {
       // Ban button
       const banBtn = document.createElement("button");
       banBtn.className = "pool-ban-btn";
-      banBtn.title = (song._poolStatus === "ban") ? "Unban" : "Ban";
+      banBtn.title = song._poolStatus === "ban" ? "Unban" : "Ban";
       banBtn.innerHTML = '<i class="fas fa-ban"></i>';
       banBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -1572,17 +1639,25 @@ const CustomPool = {
 
       const pickBtn = document.createElement("button");
       pickBtn.className = "btn";
-      pickBtn.style.cssText = "padding:4px 8px;font-size:12px;background:linear-gradient(135deg, #10b981, #059669);border:none;";
+      pickBtn.style.cssText =
+        "padding:4px 8px;font-size:12px;background:linear-gradient(135deg, #10b981, #059669);border:none;";
       pickBtn.title = "Pick";
       pickBtn.innerHTML = '<i class="fas fa-check"></i>';
-      pickBtn.addEventListener("click", (e) => { e.stopPropagation(); this.toggleStatus(song, "pick"); });
+      pickBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.toggleStatus(song, "pick");
+      });
 
       const banBtn = document.createElement("button");
       banBtn.className = "btn";
-      banBtn.style.cssText = "padding:4px 8px;font-size:12px;background:linear-gradient(135deg, #f59e0b, #d97706);border:none;";
+      banBtn.style.cssText =
+        "padding:4px 8px;font-size:12px;background:linear-gradient(135deg, #f59e0b, #d97706);border:none;";
       banBtn.title = "Ban";
       banBtn.innerHTML = '<i class="fas fa-ban"></i>';
-      banBtn.addEventListener("click", (e) => { e.stopPropagation(); this.toggleStatus(song, "ban"); });
+      banBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.toggleStatus(song, "ban");
+      });
 
       const removeBtn = document.createElement("button");
       removeBtn.className = "btn";
@@ -1631,7 +1706,9 @@ const ContextMenu = {
       if (this._currentSong) {
         UI.pickSong(this._currentSong);
         // switch to calc page and set menu active
-        document.querySelectorAll(".menu button").forEach((b) => b.classList.remove("active"));
+        document
+          .querySelectorAll(".menu button")
+          .forEach((b) => b.classList.remove("active"));
         document.querySelector('[data-page="calc"]')?.classList.add("active");
       }
       this.hide();
@@ -1704,23 +1781,33 @@ const ContextMenu = {
     });
 
     // Long-press (mobile)
-    el.addEventListener("touchstart", (e) => {
-      // Single-finger long press only
-      if (e.touches.length !== 1) return;
-      const touch = e.touches[0];
-      this._longPressTimer = setTimeout(() => {
-        this.show(song, touch.clientX, touch.clientY);
-        // Prevent click from firing after long press
-        el.addEventListener("touchend", (te) => te.preventDefault(), { once: true });
-      }, this._longPressDuration);
-    }, { passive: true });
+    el.addEventListener(
+      "touchstart",
+      (e) => {
+        // Single-finger long press only
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        this._longPressTimer = setTimeout(() => {
+          this.show(song, touch.clientX, touch.clientY);
+          // Prevent click from firing after long press
+          el.addEventListener("touchend", (te) => te.preventDefault(), {
+            once: true,
+          });
+        }, this._longPressDuration);
+      },
+      { passive: true },
+    );
 
     el.addEventListener("touchend", () => {
       clearTimeout(this._longPressTimer);
     });
-    el.addEventListener("touchmove", () => {
-      clearTimeout(this._longPressTimer);
-    }, { passive: true });
+    el.addEventListener(
+      "touchmove",
+      () => {
+        clearTimeout(this._longPressTimer);
+      },
+      { passive: true },
+    );
   },
 };
 
@@ -1877,13 +1964,25 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target === DOM.poolEditModal) UI.closePoolEditModal();
   });
 
-  // Close difficulty dropdown on outside click
+  // Close difficulty & album dropdowns on outside click
   document.addEventListener("click", (e) => {
-    const dd = document.getElementById("difficultyDropdown");
-    const btn = document.querySelector(".select-button");
-    if (!dd || !btn) return;
-    if (!btn.contains(e.target) && !dd.contains(e.target)) {
-      dd.style.display = "none";
+    // difficulty dropdown
+    const diffDd = document.getElementById("difficultyDropdown");
+    const diffBtn = document.querySelector(".select-button");
+    if (diffDd && diffBtn) {
+      if (!diffBtn.contains(e.target) && !diffDd.contains(e.target))
+        diffDd.style.display = "none";
+    }
+
+    // album dropdown (find button by label text)
+    const albumDd = document.getElementById("albumDropdown");
+    const buttons = Array.from(document.querySelectorAll(".select-button"));
+    const albumBtn = buttons.find(
+      (b) => b.textContent.trim().toLowerCase() === "album",
+    );
+    if (albumDd && albumBtn) {
+      if (!albumBtn.contains(e.target) && !albumDd.contains(e.target))
+        albumDd.style.display = "none";
     }
   });
 
@@ -1898,6 +1997,7 @@ document.addEventListener("DOMContentLoaded", () => {
     switchPage: (id) => UI.switchPage(id),
     toggleViewMode: (m) => UI.setViewMode(m),
     toggleDifficultyDropdown: () => UI.toggleDiffDropdown(),
+    toggleAlbumDropdown: () => UI.toggleAlbumDropdown(),
     nextPage: () => UI.nextPage(),
     prevPage: () => UI.prevPage(),
     // Pool globals
